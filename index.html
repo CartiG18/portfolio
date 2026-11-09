@@ -17,12 +17,17 @@
     <a class="skip-link" href="#main">Skip to content</a>
     <header class="site-header">
       <a class="brand" href="#/">The Carter Gladden Museum</a>
+      <div class="header-actions">
+      <button type="button" class="sound-toggle bezel" id="sound-toggle" aria-pressed="false">
+        Sound <span data-sound-state>off</span>
+      </button>
       <details class="map" id="map">
         <summary>Portfolio</summary>
         <nav aria-label="Portfolio">
           <ol id="map-list"></ol>
         </nav>
       </details>
+      </div>
     </header>
     <main id="main" tabindex="-1"></main>
     <script type="module" src="/src/main.ts"></script>

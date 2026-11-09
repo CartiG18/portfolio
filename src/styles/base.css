@@ -255,3 +255,19 @@ body.is-travelling .site-header {
     transition-duration: 1ms !important;
   }
 }
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Sound only matters indoors; the exterior keeps a single Portfolio button. */
+body[data-view='grounds'] .sound-toggle {
+  display: none;
+}
+
+.sound-toggle[aria-pressed='true'] {
+  color: var(--accent);
+  border-color: var(--accent);
+}

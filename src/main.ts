@@ -9,6 +9,7 @@ import { renderGrounds, mountGrounds, type SceneController } from './components/
 import { renderLobby, mountLobby } from './components/lobby.ts'
 import { mountExhibit, renderExhibit, renderNotFound } from './components/exhibit.ts'
 import { esc } from './components/html.ts'
+import { sound } from './audio.ts'
 
 const REDUCED_MOTION = window.matchMedia('(prefers-reduced-motion: reduce)')
 
@@ -146,6 +147,14 @@ document.addEventListener('keydown', (event) => {
     mapDetails.open = false
     mapDetails.querySelector('summary')?.focus()
   }
+})
+
+// Sound is off until the visitor turns it on; the click is the gesture that unlocks audio.
+const soundToggle = document.querySelector<HTMLButtonElement>('#sound-toggle')!
+soundToggle.addEventListener('click', () => {
+  sound.setEnabled(!sound.on)
+  soundToggle.setAttribute('aria-pressed', String(sound.on))
+  soundToggle.querySelector('[data-sound-state]')!.textContent = sound.on ? 'on' : 'off'
 })
 
 window.addEventListener('hashchange', () => {

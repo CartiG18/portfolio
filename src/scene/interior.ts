@@ -8,6 +8,7 @@ import { findExhibit } from '../data/exhibits.ts'
 import { ACCENT, PALETTE } from './palette.ts'
 import { socialLinks } from '../data/site.ts'
 import { bookNotes } from '../data/content.ts'
+import { sound } from '../audio.ts'
 import { SOCIAL_ICON_PATHS } from '../data/icons.ts'
 
 export interface InteriorOptions {
@@ -324,6 +325,7 @@ export async function createInterior(opts: InteriorOptions): Promise<InteriorHan
       opts.onBookNote?.(null)
       return
     }
+    sound.pageTurn()
     const b = books[index]
     const screen = b.home.clone().addScaledVector(b.normal, 0.6).project(stage.camera)
     const rect = opts.canvas.getBoundingClientRect()
@@ -402,6 +404,7 @@ export async function createInterior(opts: InteriorOptions): Promise<InteriorHan
     const end = door.center.clone().addScaledVector(door.normal, 0.6).setY(Math.min(eye, door.center.y + 0.5))
     // Head down the centre aisle first so the walk doesn't cut across the reading tables.
     const firstStep = new THREE.Vector3(0, eye, Math.min(-2, approach.z * 0.75))
+    sound.steps(1.5)
     stage.fly({
       curve: new THREE.CubicBezierCurve3(new THREE.Vector3(), firstStep, approach, end),
       lookAt: door.center,
@@ -421,6 +424,7 @@ export async function createInterior(opts: InteriorOptions): Promise<InteriorHan
     const home = stage.home
     const atDoor = back.center.clone().addScaledVector(back.normal, 2.2).setY(eye)
     const approach = back.center.clone().addScaledVector(back.normal, 5).setY(eye)
+    sound.steps(1.5)
     stage.fly({
       from: { position: atDoor, lookAt: atDoor.clone().addScaledVector(back.normal, 6) },
       curve: new THREE.CubicBezierCurve3(

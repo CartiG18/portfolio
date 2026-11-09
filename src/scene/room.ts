@@ -6,6 +6,7 @@ import { buildCenterpiece, type ExhibitItem } from './centerpieces.ts'
 import { createMotes } from './atmosphere.ts'
 import { contactShadowTexture, ensureFonts } from './labels.ts'
 import type { ExhibitId } from '../data/exhibits.ts'
+import { sound } from '../audio.ts'
 
 export interface RoomOptions {
   canvas: HTMLCanvasElement
@@ -172,6 +173,8 @@ export async function createExhibitRoom(opts: RoomOptions): Promise<RoomHandle> 
     opts.onOpenChange(id)
     stage.setFocus(it.view.target)
     focusPoint.copy(it.view.target)
+    sound.steps(1.1, 2)
+    window.setTimeout(() => sound.pageTurn(), 700)
     stage.fly({
       curve: new THREE.CubicBezierCurve3(
         new THREE.Vector3(),
