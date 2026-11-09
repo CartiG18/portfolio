@@ -4,30 +4,31 @@ import type { ExhibitId } from '../data/exhibits.ts'
 
 /** Victorian library interior: dark woods, maroon, brass, candlelight. */
 export const LIBRARY_STYLES: Record<string, BlockStyle> = {
-  floorA: { color: 0x3b2416, jitter: 0.12, castShadow: false },
-  floorB: { color: 0x2f1c11, jitter: 0.12, castShadow: false },
-  wainscot: { color: 0x2a170d, jitter: 0.1 },
-  trimWood: { color: 0x4a2c18, jitter: 0.08 },
-  maroon: { color: 0x48161b, jitter: 0.1 },
-  crown: { color: 0x3a2214, jitter: 0.08 },
-  woodDark: { color: 0x24140b, jitter: 0.1 },
-  shelfBoard: { color: 0x553319, jitter: 0.1 },
-  tableWood: { color: 0x4a2a17, jitter: 0.08 },
-  leather: { color: 0x5c1a1a, jitter: 0.12 },
-  carpet: { color: 0x4a1015, jitter: 0.06, castShadow: false },
-  carpetGold: { color: 0x9a7330, jitter: 0.05, castShadow: false },
-  brass: { color: 0xc9a14a, emissive: 0x3a2604, emissiveIntensity: 0.5, jitter: 0.08 },
-  wax: { color: 0xf1e6c8, jitter: 0.05, castShadow: false },
+  floorA: { color: 0x4a2d1a, jitter: 0.1, castShadow: false, texture: 'planks', roughness: 0.7, floorAO: true },
+  floorB: { color: 0x3e2515, jitter: 0.1, castShadow: false, texture: 'planks', roughness: 0.7, floorAO: true },
+  wainscot: { color: 0x34200f, jitter: 0.06, texture: 'grain', roughness: 0.6, floorAO: true },
+  trimWood: { color: 0x553319, jitter: 0.06, texture: 'grain', roughness: 0.55 },
+  maroon: { color: 0x48161b, jitter: 0.04, texture: 'damask', texScale: 0.5, roughness: 0.9, floorAO: true },
+  crown: { color: 0x452816, jitter: 0.06, texture: 'grain', roughness: 0.55 },
+  woodDark: { color: 0x2e1a0e, jitter: 0.08, texture: 'grain', roughness: 0.6, floorAO: true },
+  shelfBoard: { color: 0x5e3a1d, jitter: 0.08, texture: 'grain', roughness: 0.6 },
+  tableWood: { color: 0x5a331b, jitter: 0.05, texture: 'grain', texScale: 2, roughness: 0.45, floorAO: true },
+  leather: { color: 0x5c1a1a, jitter: 0.08, texture: 'leather', texScale: 2, roughness: 0.55 },
+  carpet: { color: 0x4a1015, jitter: 0.04, castShadow: false, texture: 'carpet', texScale: 2, roughness: 1 },
+  carpetGold: { color: 0x9a7330, jitter: 0.04, castShadow: false, texture: 'carpet', texScale: 4, roughness: 0.9 },
+  brass: { color: 0xc9a14a, emissive: 0x3a2604, emissiveIntensity: 0.4, jitter: 0.06, texture: 'brass', texScale: 4, roughness: 0.35, metalness: 0.8 },
+  goldFoil: { color: 0xe8c066, emissive: 0x7a5410, emissiveIntensity: 0.9, castShadow: false, roughness: 0.3, metalness: 0.9 },
+  wax: { color: 0xf1e6c8, jitter: 0.05, castShadow: false, texture: 'paper', texScale: 4, roughness: 0.8 },
   flame: { color: 0xffd27a, emissive: 0xff9a2a, emissiveIntensity: 2.0, castShadow: false },
   greenGlass: { color: 0x2f7a4a, emissive: 0x1f8a4a, emissiveIntensity: 1.6, castShadow: false },
-  bookRed: { color: 0x9a2a26, jitter: 0.3 },
-  bookGreen: { color: 0x2d6a45, jitter: 0.3 },
-  bookNavy: { color: 0x2c3f70, jitter: 0.3 },
-  bookBrown: { color: 0x7d5228, jitter: 0.3 },
-  bookOchre: { color: 0xb88431, jitter: 0.3 },
-  bookBlack: { color: 0x2e2925, jitter: 0.3 },
+  bookRed: { color: 0x9a2a26, jitter: 0.3, texture: 'leather', texScale: 3, roughness: 0.7 },
+  bookGreen: { color: 0x2d6a45, jitter: 0.3, texture: 'leather', texScale: 3, roughness: 0.7 },
+  bookNavy: { color: 0x2c3f70, jitter: 0.3, texture: 'leather', texScale: 3, roughness: 0.7 },
+  bookBrown: { color: 0x7d5228, jitter: 0.3, texture: 'leather', texScale: 3, roughness: 0.7 },
+  bookOchre: { color: 0xb88431, jitter: 0.3, texture: 'leather', texScale: 3, roughness: 0.7 },
+  bookBlack: { color: 0x2e2925, jitter: 0.3, texture: 'leather', texScale: 3, roughness: 0.7 },
   beyond: { color: 0x030202, castShadow: false },
-  ceiling: { color: 0x2c1910, jitter: 0.08, castShadow: false },
+  ceiling: { color: 0x3a2214, jitter: 0.06, castShadow: false, texture: 'coffer', texScale: 0.5, roughness: 0.8 },
 }
 
 const BOOKS = ['bookRed', 'bookGreen', 'bookNavy', 'bookBrown', 'bookOchre', 'bookBlack', 'bookRed', 'bookBrown']
@@ -54,7 +55,16 @@ export interface PortraitSpot {
   normal: THREE.Vector3
 }
 
+/** Soft dark ovals under furniture where it meets the floor. */
+export interface ContactShadow {
+  x: number
+  z: number
+  w: number
+  d: number
+}
+
 export interface LibraryInfo {
+  contactShadows: ContactShadow[]
   doors: DoorSpot[]
   portraits: PortraitSpot[]
   chandeliers: THREE.Vector3[]
@@ -120,6 +130,8 @@ export function buildLibrary(b: VoxelBuilder, rand: () => number): LibraryInfo {
   const doorsOn = (wall: Wall) => DOOR_DEFS.filter((d) => d.wall === wall)
   const doors: DoorSpot[] = []
   const sconces: THREE.Vector3[] = []
+  const shelfTops: Array<{ x: number; z: number }> = []
+  const contactShadows: ContactShadow[] = []
 
   for (const wall of ['back', 'left', 'right'] as Wall[]) {
     const [u0, u1] = wallRange(wall)
@@ -192,6 +204,10 @@ export function buildLibrary(b: VoxelBuilder, rand: () => number): LibraryInfo {
       runIndex++
       b.set('woodDark', ...cell(wall, u, 1, 1))
       b.set('crown', ...cell(wall, u, ROOM.shelfTop, 1))
+      {
+        const [tx, , tz] = cell(wall, u, 0, 1)
+        shelfTops.push({ x: tx, z: tz })
+      }
       // Thin vertical dividers between shelf bays.
       const along = wall === 'back' ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 0, 1)
       for (const [edge, side] of [[startsRun, -1], [endsRun, 1]] as const) {
@@ -215,25 +231,22 @@ export function buildLibrary(b: VoxelBuilder, rand: () => number): LibraryInfo {
           0.1,
           wall === 'back' ? 0.95 : 1,
         )
-        // Books packed across the cell, with the odd gap.
-        let offset = -0.46
-        while (offset < 0.4) {
-          const thick = 0.1 + rand() * 0.12
-          if (rand() < 0.07) {
-            offset += thick + 0.1
-            continue
-          }
-          const tall = 0.55 + rand() * 0.3
-          const depth = 0.55 + rand() * 0.15
-          const pos = new THREE.Vector3(x, y - 0.4 + tall / 2, z)
-            .addScaledVector(along, offset + thick / 2)
-            .addScaledVector(n, -0.45 + depth / 2)
-          const style = BOOKS[Math.floor(rand() * BOOKS.length)]
-          if (wall === 'back') b.prop(style, pos.x, pos.y, pos.z, thick * 0.92, tall, depth)
-          else b.prop(style, pos.x, pos.y, pos.z, depth, tall, thick * 0.92)
-          offset += thick
-        }
+        shelfRow(b, rand, wall, x, y, z, along, n)
       }
+    }
+  }
+
+  // Books lying flat on top of some shelf bays.
+  for (const t of shelfTops) {
+    if (rand() > 0.35) continue
+    let top = ROOM.shelfTop + 0.5
+    const count = 2 + Math.floor(rand() * 3)
+    for (let i = 0; i < count; i++) {
+      const h = 0.1 + rand() * 0.06
+      const w = 0.5 + rand() * 0.25
+      const d = 0.4 + rand() * 0.15
+      b.prop(BOOKS[Math.floor(rand() * BOOKS.length)], t.x + (rand() - 0.5) * 0.15, top + h / 2, t.z + (rand() - 0.5) * 0.1, w, h, d, { y: (rand() - 0.5) * 0.5 })
+      top += h
     }
   }
 
@@ -252,29 +265,33 @@ export function buildLibrary(b: VoxelBuilder, rand: () => number): LibraryInfo {
   // ---------- Reading tables, chairs, lamps, candles ----------
   const tableCandles: THREE.Vector3[] = []
   for (const tx of [-6.5, 6.5]) {
-    b.prop('tableWood', tx, 1.7, -9, 2.6, 0.2, 9)
-    for (const dx of [-1.1, 1.1]) for (const dz of [-4.2, 4.2]) b.prop('woodDark', tx + dx, 1.05, -9 + dz, 0.25, 1.1, 0.25)
+    readingTable(b, tx, -9)
+    contactShadows.push({ x: tx, z: -9, w: 3.4, d: 9.8 })
     for (const z of [-11.5, -6.5]) {
-      b.prop('brass', tx, 2.05, z, 0.18, 0.5, 0.18)
-      b.prop('greenGlass', tx, 2.35, z, 0.9, 0.25, 0.45)
+      b.prop('brass', tx, 1.86, z, 0.36, 0.06, 0.36)
+      b.prop('brass', tx, 2.12, z, 0.1, 0.5, 0.1)
+      b.prop('greenGlass', tx, 2.4, z, 0.85, 0.22, 0.42)
+      b.prop('brass', tx, 2.52, z, 0.9, 0.03, 0.46)
     }
     for (const z of [-13, -9, -5]) {
-      b.prop('brass', tx, 1.85, z, 0.3, 0.08, 0.3)
-      b.prop('wax', tx, 2.1, z, 0.14, 0.45, 0.14)
-      b.prop('flame', tx, 2.42, z, 0.1, 0.18, 0.1)
-      tableCandles.push(new THREE.Vector3(tx, 2.42, z))
+      b.prop('brass', tx, 1.86, z, 0.3, 0.06, 0.3)
+      b.prop('brass', tx, 1.93, z, 0.18, 0.08, 0.18)
+      b.prop('wax', tx, 2.15, z, 0.13, 0.4, 0.13)
+      b.prop('flame', tx, 2.44, z, 0.08, 0.16, 0.08)
+      tableCandles.push(new THREE.Vector3(tx, 2.44, z))
     }
-    // A few books left open on the table.
+    // Open books and a closed stack on each table.
     for (const z of [-12.2, -8, -3.8]) {
-      b.prop(BOOKS[Math.floor(rand() * 6)], tx + 0.5, 1.86, z, 0.7, 0.1, 0.5)
-      b.prop('wax', tx + 0.5, 1.92, z, 0.62, 0.03, 0.44)
+      const style = BOOKS[Math.floor(rand() * 6)]
+      b.prop(style, tx + 0.5, 1.88, z, 0.72, 0.06, 0.52, { y: (rand() - 0.5) * 0.4 })
+      b.prop('wax', tx + 0.36, 1.93, z, 0.33, 0.04, 0.46, { y: (rand() - 0.5) * 0.4, z: 0.08 })
+      b.prop('wax', tx + 0.64, 1.93, z, 0.33, 0.04, 0.46, { y: (rand() - 0.5) * 0.4, z: -0.08 })
     }
+    for (let i = 0; i < 3; i++) b.prop(BOOKS[Math.floor(rand() * 6)], tx - 0.6, 1.9 + i * 0.13, -10.2, 0.6, 0.12, 0.45, { y: (rand() - 0.5) * 0.5 })
     for (const side of [-1, 1])
       for (const z of [-12, -9, -6]) {
-        const cx = tx + side * 1.9
-        b.prop('woodDark', cx, 0.85, z, 0.8, 0.7, 0.8)
-        b.prop('leather', cx, 1.25, z, 0.9, 0.15, 0.9)
-        b.prop('leather', cx + side * 0.4, 1.85, z, 0.15, 1.1, 0.9)
+        chair(b, tx + side * 1.95, z, side)
+        contactShadows.push({ x: tx + side * 1.95, z, w: 1.1, d: 1.1 })
       }
   }
 
@@ -303,5 +320,87 @@ export function buildLibrary(b: VoxelBuilder, rand: () => number): LibraryInfo {
     b.prop('brass', frame.x, frame.y, frame.z, 0.12, 3.6, 2.9)
   }
 
-  return { doors, portraits, chandeliers, tableCandles, sconces }
+  return { contactShadows, doors, portraits, chandeliers, tableCandles, sconces }
+}
+
+/** One shelf row: books of varied height and thickness, a few leaning, some with gold-foil bands. */
+function shelfRow(
+  b: VoxelBuilder,
+  rand: () => number,
+  wall: Wall,
+  x: number,
+  y: number,
+  z: number,
+  along: THREE.Vector3,
+  n: THREE.Vector3,
+): void {
+  let offset = -0.46
+  let leaned = false
+  while (offset < 0.42) {
+    const thick = 0.08 + rand() * 0.14
+    if (rand() < 0.06) {
+      // A gap, with the next book leaning into it.
+      offset += 0.12
+      leaned = true
+      continue
+    }
+    const tall = 0.5 + rand() * 0.36
+    const depth = 0.5 + rand() * 0.2
+    const style = BOOKS[Math.floor(rand() * BOOKS.length)]
+    const lean = leaned ? 0.28 : 0
+    leaned = false
+    const pos = new THREE.Vector3(x, y - 0.4 + (tall / 2) * Math.cos(lean), z)
+      .addScaledVector(along, offset + thick / 2 + Math.sin(lean) * tall * 0.4)
+      .addScaledVector(n, -0.45 + depth / 2)
+    // Lean toward the gap (the -along direction).
+    const rot = wall === 'back' ? { z: lean } : { x: wall === 'left' ? -lean : -lean }
+    if (wall === 'back') b.prop(style, pos.x, pos.y, pos.z, thick * 0.92, tall, depth, rot)
+    else b.prop(style, pos.x, pos.y, pos.z, depth, tall, thick * 0.92, rot)
+
+    // Gold-foil bands across the spine on roughly a third of the books.
+    if (!lean && rand() < 0.35) {
+      const spine = pos.clone().addScaledVector(n, depth / 2 + 0.006)
+      for (const dy of rand() < 0.5 ? [-0.32, 0.3] : [0.28]) {
+        const by = spine.y + dy * tall
+        if (wall === 'back') b.prop('goldFoil', spine.x, by, spine.z, thick * 0.85, 0.05, 0.012)
+        else b.prop('goldFoil', spine.x, by, spine.z, 0.012, 0.05, thick * 0.85)
+      }
+    }
+    offset += thick + Math.sin(lean) * tall * 0.6
+  }
+}
+
+/** A long reading table: overhanging top with a moulded edge, apron, and turned legs. */
+function readingTable(b: VoxelBuilder, x: number, z: number): void {
+  const w = 2.6
+  const d = 9
+  const topY = 1.72
+  b.prop('tableWood', x, topY, z, w, 0.14, d)
+  b.prop('tableWood', x, topY - 0.1, z, w - 0.12, 0.06, d - 0.12) // moulded underside
+  b.prop('leather', x, topY + 0.072, z, w - 0.5, 0.01, d - 0.6) // inset writing surface
+  b.prop('woodDark', x, topY - 0.25, z + d / 2 - 0.35, w - 0.4, 0.22, 0.1) // aprons
+  b.prop('woodDark', x, topY - 0.25, z - d / 2 + 0.35, w - 0.4, 0.22, 0.1)
+  b.prop('woodDark', x + w / 2 - 0.3, topY - 0.25, z, 0.1, 0.22, d - 0.7)
+  b.prop('woodDark', x - w / 2 + 0.3, topY - 0.25, z, 0.1, 0.22, d - 0.7)
+  for (const dx of [-1, 1])
+    for (const dz of [-1, 1]) {
+      const lx = x + dx * (w / 2 - 0.3)
+      const lz = z + dz * (d / 2 - 0.35)
+      b.prop('woodDark', lx, 1.22, lz, 0.22, 0.6, 0.22) // upper leg
+      b.prop('tableWood', lx, 0.88, lz, 0.28, 0.1, 0.28) // turned collar
+      b.prop('woodDark', lx, 0.66, lz, 0.16, 0.34, 0.16) // tapered foot
+    }
+  b.prop('woodDark', x, 0.75, z, 0.08, 0.08, d - 0.9) // stretcher
+}
+
+/** A leather library chair facing the table; `side` is which side of the table it's on. */
+function chair(b: VoxelBuilder, x: number, z: number, side: number): void {
+  for (const dx of [-0.32, 0.32])
+    for (const dz of [-0.32, 0.32]) b.prop('woodDark', x + dx, 0.85, z + dz, 0.1, 0.7, 0.1)
+  b.prop('woodDark', x, 1.22, z, 0.86, 0.08, 0.86) // seat frame
+  b.prop('leather', x, 1.32, z, 0.76, 0.12, 0.76) // cushion
+  const bx = x + side * 0.38
+  for (const dz of [-0.36, 0.36]) b.prop('woodDark', bx, 1.85, z + dz, 0.1, 1.2, 0.1) // back posts
+  b.prop('tableWood', bx, 2.42, z, 0.12, 0.1, 0.84) // top rail
+  b.prop('leather', bx - side * 0.02, 1.9, z, 0.06, 0.8, 0.62) // padded back
 }

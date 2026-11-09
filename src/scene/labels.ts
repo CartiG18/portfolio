@@ -116,3 +116,18 @@ export function doorGlowTexture(): THREE.CanvasTexture {
   g.fillRect(0, 0, w, h)
   return texture(c)
 }
+
+/** A soft dark oval used for contact shadows under furniture. */
+export function contactShadowTexture(): THREE.CanvasTexture {
+  const s = 128
+  const c = document.createElement('canvas')
+  c.width = c.height = s
+  const g = c.getContext('2d')!
+  const grad = g.createRadialGradient(s / 2, s / 2, s * 0.1, s / 2, s / 2, s / 2)
+  grad.addColorStop(0, 'rgba(0,0,0,0.85)')
+  grad.addColorStop(0.6, 'rgba(0,0,0,0.45)')
+  grad.addColorStop(1, 'rgba(0,0,0,0)')
+  g.fillStyle = grad
+  g.fillRect(0, 0, s, s)
+  return new THREE.CanvasTexture(c)
+}

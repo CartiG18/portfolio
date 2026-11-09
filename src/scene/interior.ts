@@ -3,7 +3,7 @@ import { Stage } from './stage.ts'
 import { mulberry32, VoxelBuilder } from './voxels.ts'
 import { buildLibrary, LIBRARY_STYLES } from './library.ts'
 import { createMotes } from './atmosphere.ts'
-import { doorGlowTexture, ensureFonts, placardTexture, portraitTexture } from './labels.ts'
+import { contactShadowTexture, doorGlowTexture, ensureFonts, placardTexture, portraitTexture } from './labels.ts'
 import { findExhibit } from '../data/exhibits.ts'
 import { socialLinks } from '../data/site.ts'
 import { SOCIAL_ICON_PATHS } from '../data/icons.ts'
@@ -46,6 +46,26 @@ export async function createInterior(opts: InteriorOptions): Promise<InteriorHan
   })
   const { scene } = stage
   scene.add(builder.build())
+
+  // Contact shadows where furniture meets the floor (one instanced draw call).
+  const shadows = new THREE.InstancedMesh(
+    new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2),
+    new THREE.MeshBasicMaterial({
+      map: contactShadowTexture(),
+      transparent: true,
+      depthWrite: false,
+      polygonOffset: true,
+      polygonOffsetFactor: -2,
+    }),
+    lib.contactShadows.length,
+  )
+  const m4 = new THREE.Matrix4()
+  lib.contactShadows.forEach((c, i) => {
+    m4.compose(new THREE.Vector3(c.x, 0.505, c.z), new THREE.Quaternion(), new THREE.Vector3(c.w, 1, c.d))
+    shadows.setMatrixAt(i, m4)
+  })
+  shadows.renderOrder = 1
+  scene.add(shadows)
 
   // ---------- Doors: glowing openings, brass placards, hit boxes ----------
   const doorGlows = new Map<string, THREE.MeshBasicMaterial>()
