@@ -1,0 +1,118 @@
+import * as THREE from 'three'
+
+/** Wait (briefly) for the display fonts so canvas-drawn placards use them. */
+export async function ensureFonts(): Promise<void> {
+  try {
+    await Promise.race([
+      Promise.all([
+        document.fonts.load('700 72px "Cormorant SC"'),
+        document.fonts.load('italic 500 40px "Cormorant Garamond"'),
+      ]),
+      new Promise((resolve) => setTimeout(resolve, 1500)),
+    ])
+  } catch {
+    // Fall back to Georgia.
+  }
+}
+
+function texture(canvas: HTMLCanvasElement): THREE.CanvasTexture {
+  const t = new THREE.CanvasTexture(canvas)
+  t.colorSpace = THREE.SRGBColorSpace
+  t.anisotropy = 4
+  return t
+}
+
+/** A polished brass plate with an engraved exhibit number and title. */
+export function placardTexture(kicker: string, title: string): THREE.CanvasTexture {
+  const w = 1024
+  const h = 300
+  const c = document.createElement('canvas')
+  c.width = w
+  c.height = h
+  const g = c.getContext('2d')!
+
+  const brass = g.createLinearGradient(0, 0, 0, h)
+  brass.addColorStop(0, '#f0d58a')
+  brass.addColorStop(0.5, '#c9a04a')
+  brass.addColorStop(1, '#8f6a25')
+  g.fillStyle = brass
+  g.fillRect(0, 0, w, h)
+  g.strokeStyle = 'rgba(60,40,10,0.7)'
+  g.lineWidth = 6
+  g.strokeRect(14, 14, w - 28, h - 28)
+  g.strokeStyle = 'rgba(255,240,200,0.5)'
+  g.lineWidth = 2
+  g.strokeRect(26, 26, w - 52, h - 52)
+
+  g.textAlign = 'center'
+  g.fillStyle = '#3a2610'
+  g.font = '600 38px "Source Sans 3", system-ui, sans-serif'
+  g.letterSpacing = '10px'
+  g.fillText(kicker.toUpperCase(), w / 2, 100)
+  g.letterSpacing = '2px'
+
+  let size = 104
+  g.font = `700 ${size}px "Cormorant SC", Georgia, serif`
+  while (g.measureText(title).width > w - 110 && size > 40) {
+    size -= 4
+    g.font = `700 ${size}px "Cormorant SC", Georgia, serif`
+  }
+  g.fillStyle = 'rgba(255,240,200,0.45)'
+  g.fillText(title, w / 2, 212 + 2)
+  g.fillStyle = '#2a1a08'
+  g.fillText(title, w / 2, 212)
+  return texture(c)
+}
+
+/** A framed portrait: an icon on dark velvet, with a small caption. */
+export function portraitTexture(iconPath: string, caption: string): THREE.CanvasTexture {
+  const w = 512
+  const h = 640
+  const c = document.createElement('canvas')
+  c.width = w
+  c.height = h
+  const g = c.getContext('2d')!
+  const velvet = g.createRadialGradient(w / 2, h * 0.4, 20, w / 2, h * 0.45, w * 0.8)
+  velvet.addColorStop(0, '#4a1d26')
+  velvet.addColorStop(1, '#16070b')
+  g.fillStyle = velvet
+  g.fillRect(0, 0, w, h)
+
+  g.save()
+  g.translate(w / 2 - 150, h * 0.42 - 150)
+  g.scale(300 / 24, 300 / 24)
+  g.fillStyle = '#e8c872'
+  g.fill(new Path2D(iconPath))
+  g.restore()
+
+  g.textAlign = 'center'
+  g.fillStyle = '#e8c872'
+  g.font = '700 64px "Cormorant SC", Georgia, serif'
+  g.fillText(caption, w / 2, h - 60)
+  return texture(c)
+}
+
+/** Warm light spilling from a room beyond a doorway: bright at the floor, fading upward and to the edges. */
+export function doorGlowTexture(): THREE.CanvasTexture {
+  const w = 128
+  const h = 256
+  const c = document.createElement('canvas')
+  c.width = w
+  c.height = h
+  const g = c.getContext('2d')!
+  const vertical = g.createLinearGradient(0, h, 0, 0)
+  vertical.addColorStop(0, 'rgba(255,190,110,1)')
+  vertical.addColorStop(0.45, 'rgba(255,150,70,0.55)')
+  vertical.addColorStop(1, 'rgba(255,120,50,0)')
+  g.fillStyle = vertical
+  g.fillRect(0, 0, w, h)
+  // Darken the sides so the light reads as coming from deeper in.
+  g.globalCompositeOperation = 'destination-in'
+  const sides = g.createLinearGradient(0, 0, w, 0)
+  sides.addColorStop(0, 'rgba(0,0,0,0.15)')
+  sides.addColorStop(0.5, 'rgba(0,0,0,1)')
+  sides.addColorStop(1, 'rgba(0,0,0,0.15)')
+  g.fillStyle = sides
+  g.fillRect(0, 0, w, h)
+  return texture(c)
+}

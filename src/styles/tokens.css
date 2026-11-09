@@ -1,0 +1,76 @@
+:root {
+  color-scheme: light dark;
+
+  /* Palette: classical grand hall */
+  --wall: #6e2329;
+  --wall-deep: #4a161b;
+  --wall-pattern: rgb(255 220 180 / 0.05);
+  --wainscot: #3b2418;
+  --wainscot-panel: #4a2e1f;
+  --crown: #efe6d2;
+  --marble-light: #eee7da;
+  --marble-dark: #2a2421;
+  --marble-column: #ece4d4;
+  --marble-flute: #cdbfa6;
+  --ceiling: #e6dcc6;
+  --ceiling-beam: #cbbd9f;
+
+  --gold: #c9a24a;
+  --gold-light: #ecd28b;
+  --gold-dark: #8a6a24;
+  --brass-top: #e2c272;
+  --brass-bottom: #b08a37;
+
+  --ink: #23180d;
+  --ink-soft: #4a3720;
+  --parchment: #f6efdf;
+  --on-wall: #f3e7cf;
+  --on-wall-soft: #d9c7a6;
+  --void: #0d0908;
+
+  --lamp-glow: rgb(255 214 150 / 0.28);
+  --shade: rgb(0 0 0 / 0.45);
+
+  /* Type */
+  --font-display: 'Cormorant SC', 'Cormorant Garamond', Georgia, serif;
+  --font-serif: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
+  --font-ui: 'Source Sans 3', system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  --step--1: clamp(0.85rem, 0.82rem + 0.15vw, 0.95rem);
+  --step-0: clamp(1rem, 0.96rem + 0.2vw, 1.125rem);
+  --step-1: clamp(1.25rem, 1.15rem + 0.5vw, 1.5rem);
+  --step-2: clamp(1.6rem, 1.4rem + 1vw, 2.25rem);
+  --step-3: clamp(2.2rem, 1.8rem + 2vw, 3.5rem);
+  --step-4: clamp(2.8rem, 2.1rem + 3.5vw, 5rem);
+
+  /* Spacing */
+  --space-xs: 0.5rem;
+  --space-s: 1rem;
+  --space-m: 1.5rem;
+  --space-l: 2.5rem;
+  --space-xl: 4rem;
+
+  --radius: 6px;
+  --ease-camera: cubic-bezier(0.6, 0, 0.35, 1);
+  --ease-out: cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+/* Night at the museum */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --wall: #3f1418;
+    --wall-deep: #250a0d;
+    --wall-pattern: rgb(255 220 180 / 0.035);
+    --wainscot: #22140d;
+    --wainscot-panel: #2c1a11;
+    --crown: #b9ad95;
+    --marble-light: #9c958a;
+    --marble-dark: #141110;
+    --marble-column: #b5ad9e;
+    --marble-flute: #8c826f;
+    --ceiling: #4d4639;
+    --ceiling-beam: #3a342a;
+    --lamp-glow: rgb(255 200 120 / 0.34);
+    --shade: rgb(0 0 0 / 0.6);
+  }
+}

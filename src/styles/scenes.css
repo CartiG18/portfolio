@@ -1,0 +1,108 @@
+/* Full-screen 3D views (grounds + library). */
+
+body[data-view='grounds'],
+body[data-view='lobby'] {
+  overflow: hidden;
+  background: #05070d;
+}
+
+.scene-view {
+  position: relative;
+  height: 100svh;
+  overflow: hidden;
+}
+
+.grounds {
+  background: radial-gradient(ellipse 60% 50% at 50% 55%, #142338, #05070d 70%);
+}
+
+.lobby {
+  background: radial-gradient(ellipse 60% 50% at 50% 55%, #2a160c, #080504 70%);
+}
+
+.scene-view__canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  opacity: 0;
+  transition: opacity 1200ms ease;
+}
+
+.scene-view.is-ready .scene-view__canvas {
+  opacity: 1;
+}
+
+.scene-view__fade {
+  position: absolute;
+  inset: 0;
+  background: #000;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Arriving in a 3D view fades up from black. */
+#main.is-arriving .scene-view__fade {
+  animation: lights-up 900ms ease-out forwards;
+}
+
+@keyframes lights-up {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+/* Keyboard / screen-reader door list: hidden until focused, always shown without WebGL. */
+.lobby-directory {
+  position: absolute;
+  left: clamp(16px, 3vw, 32px);
+  bottom: clamp(16px, 3vh, 32px);
+  z-index: 5;
+  padding: 8px;
+  background: rgb(10 7 4 / 0.85);
+  border: 1px solid rgb(255 206 102 / 0.75);
+  box-shadow: 0 0 10px rgb(255 206 102 / 0.3);
+}
+
+.lobby-directory:not(:focus-within) {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  border: 0;
+}
+
+.no-webgl .lobby-directory {
+  position: absolute !important;
+  width: auto;
+  height: auto;
+  padding: 8px;
+  overflow: visible;
+  clip-path: none;
+  border: 1px solid rgb(255 206 102 / 0.75);
+}
+
+.lobby-directory ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lobby-directory a {
+  display: block;
+  padding: 0.4rem 0.7rem;
+  font-size: 0.9rem;
+  color: #efe0bd;
+  text-decoration: none;
+}
+
+.lobby-directory a:hover,
+.lobby-directory a:focus-visible {
+  background: rgb(255 206 102 / 0.12);
+}
