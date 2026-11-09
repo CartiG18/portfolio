@@ -3,6 +3,8 @@ import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js'
+import { BokehPass } from 'three/examples/jsm/postprocessing/BokehPass.js'
+import { createGradePass, type GradeOptions } from './grade.ts'
 
 /**
  * Shared "diorama" stage for the 3D views: renderer + bloom, a raised camera aimed at a
@@ -15,6 +17,10 @@ export interface StageOptions {
   fog: { near: number; far: number }
   exposure: number
   bloom: { strength: number; radius: number; threshold: number }
+  /** Vignette, grain and warm grade (display space). */
+  grade?: GradeOptions
+  /** Allow depth of field, used while an exhibit item is in focus. */
+  depthOfField?: boolean
   camera: {
     /** Vertical FOV at a 16:10 landscape aspect. */
     fov: number
@@ -68,6 +74,10 @@ export class Stage {
 
   private renderer: THREE.WebGLRenderer
   private composer: EffectComposer
+  private bokeh: BokehPass | null = null
+  private grade: ReturnType<typeof createGradePass> | null = null
+  private focusTarget: THREE.Vector3 | null = null
+  private focusAmount = 0
   private opts: StageOptions
   private basePos = new THREE.Vector3()
   private right = new THREE.Vector3()
@@ -95,7 +105,8 @@ export class Stage {
     const { canvas } = opts
 
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' })
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+    // 1.5× is visually indistinguishable here under bloom and grain, and much cheaper than 2×.
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5))
     this.renderer.shadowMap.enabled = true
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping
@@ -107,9 +118,18 @@ export class Stage {
 
     this.composer = new EffectComposer(this.renderer)
     this.composer.addPass(new RenderPass(this.scene, this.camera))
+    if (opts.depthOfField) {
+      this.bokeh = new BokehPass(this.scene, this.camera, { focus: 5, aperture: 0.004, maxblur: 0.008 })
+      this.bokeh.enabled = false
+      this.composer.addPass(this.bokeh)
+    }
     const { strength, radius, threshold } = opts.bloom
     this.composer.addPass(new UnrealBloomPass(new THREE.Vector2(1, 1), strength, radius, threshold))
     this.composer.addPass(new OutputPass())
+    if (opts.grade) {
+      this.grade = createGradePass(opts.grade)
+      this.composer.addPass(this.grade)
+    }
 
     this.resizeObserver = new ResizeObserver(() => this.resize())
     this.resizeObserver.observe(canvas)
@@ -148,6 +168,11 @@ export class Stage {
   /** Current look target, e.g. to start a flight from where the camera is pointing. */
   get currentLookAt(): THREE.Vector3 {
     return this.lookAt.clone()
+  }
+
+  /** Bring a point into sharp focus with depth of field (null to clear). */
+  setFocus(target: THREE.Vector3 | null): void {
+    this.focusTarget = target ? target.clone() : null
   }
 
   /** Highlight an item from outside the canvas (e.g. a focused keyboard button). */
@@ -189,6 +214,7 @@ export class Stage {
       const time = this.clock.getElapsedTime()
       for (const t of this.tickers) t(time, dt)
       this.updateCamera(time, dt)
+      this.updatePost(time, dt)
       this.composer.render()
     }
     tick()
@@ -326,6 +352,20 @@ export class Stage {
     if (this.pointerDirty && this.pointerInside) {
       this.pointerDirty = false
       this.setHover(this.pick())
+    }
+  }
+
+  private updatePost(time: number, dt: number): void {
+    if (this.grade) this.grade.uniforms.uTime.value = time
+    if (!this.bokeh) return
+    const want = this.focusTarget && !this.opts.reducedMotion ? 1 : 0
+    this.focusAmount += (want - this.focusAmount) * Math.min(1, dt * 3)
+    this.bokeh.enabled = this.focusAmount > 0.02
+    if (this.bokeh.enabled) {
+      const u = (this.bokeh as unknown as { uniforms: Record<string, THREE.IUniform> }).uniforms
+      if (this.focusTarget) u.focus.value = this.camera.position.distanceTo(this.focusTarget)
+      u.aperture.value = 0.0035 * this.focusAmount
+      u.maxblur.value = 0.008 * this.focusAmount
     }
   }
 

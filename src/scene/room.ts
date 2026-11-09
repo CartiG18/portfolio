@@ -93,11 +93,20 @@ export async function createExhibitRoom(opts: RoomOptions): Promise<RoomHandle> 
     fog: { near: 20, far: 45 },
     exposure: 1.0,
     bloom: { strength: 0.45, radius: 0.4, threshold: 0.9 },
+    grade: { vignette: 0.55, grain: 0.035, warmth: 0.6 },
+    depthOfField: true,
     camera: { fov: 55, position: new THREE.Vector3(0, EYE, 1.5), target: piece.focus },
     lookAround: { yawDeg: 22, pitchDeg: 8 },
   })
   const { scene } = stage
-  scene.add(builder.build(), piece.group)
+  const shell = builder.build()
+  scene.add(shell, piece.group)
+  const flameMats = new Set<THREE.MeshStandardMaterial>()
+  for (const root of [shell, piece.group])
+    root.traverse((o) => {
+      const m = (o as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined
+      if (m && 'emissive' in m && m.emissive.getHex() === 0xff9a2a) flameMats.add(m)
+    })
 
   const shadow = new THREE.Mesh(
     new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2),
@@ -115,9 +124,6 @@ export async function createExhibitRoom(opts: RoomOptions): Promise<RoomHandle> 
   scene.add(key, key.target)
   const chandelierLight = new THREE.PointLight(0xffa850, 45, 20, 1.6)
   chandelierLight.position.copy(chandelier).setY(chandelier.y - 0.6)
-  chandelierLight.castShadow = true
-  chandelierLight.shadow.mapSize.set(1024, 1024)
-  chandelierLight.shadow.bias = -0.002
   scene.add(chandelierLight)
   for (const x of [-4, 4]) {
     const fill = new THREE.PointLight(0xffa850, 20, 12, 1.6)
@@ -164,6 +170,8 @@ export async function createExhibitRoom(opts: RoomOptions): Promise<RoomHandle> 
     for (const other of piece.items) other.wantActive = other.id === id
     openId = id
     opts.onOpenChange(id)
+    stage.setFocus(it.view.target)
+    focusPoint.copy(it.view.target)
     stage.fly({
       curve: new THREE.CubicBezierCurve3(
         new THREE.Vector3(),
@@ -192,6 +200,7 @@ export async function createExhibitRoom(opts: RoomOptions): Promise<RoomHandle> 
     for (const it of piece.items) it.wantActive = false
     openId = null
     opts.onOpenChange(null)
+    stage.setFocus(null)
     const home = stage.home
     stage.fly({
       curve: new THREE.CubicBezierCurve3(
@@ -207,9 +216,15 @@ export async function createExhibitRoom(opts: RoomOptions): Promise<RoomHandle> 
     })
   }
 
+  const focusPoint = new THREE.Vector3()
+  motes.material.uniforms.uFocus.value = focusPoint
   const timeScale = opts.reducedMotion ? 0.3 : 1
   stage.addTicker((time, dt) => {
     motes.material.uniforms.uTime.value = time * timeScale
+    const fs = motes.material.uniforms.uFocusStrength
+    fs.value += ((openId ? 1 : 0) - fs.value) * Math.min(1, dt * 2)
+    const ft = time * timeScale
+    for (const m of flameMats) m.emissiveIntensity = 2.0 * (0.85 + Math.sin(ft * 13) * 0.08 + Math.sin(ft * 29) * 0.05)
     const t = time * timeScale
     chandelierLight.intensity = 45 * (0.9 + Math.sin(t * 9) * 0.04 + Math.sin(t * 23) * 0.03)
     const k = opts.reducedMotion ? 1 : Math.min(1, dt * 6)

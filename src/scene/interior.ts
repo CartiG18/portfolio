@@ -44,6 +44,7 @@ export async function createInterior(opts: InteriorOptions): Promise<InteriorHan
     fog: { near: 32, far: 70 },
     exposure: 1.0,
     bloom: { strength: 0.45, radius: 0.4, threshold: 0.9 },
+    grade: { vignette: 0.55, grain: 0.035, warmth: 0.6 },
     // Standing just inside the entrance at eye level (~2.8 blocks above the floor),
     // facing the Projects Gallery doors.
     camera: {
@@ -54,7 +55,11 @@ export async function createInterior(opts: InteriorOptions): Promise<InteriorHan
     lookAround: { yawDeg: 38, pitchDeg: 12 },
   })
   const { scene } = stage
-  scene.add(builder.build())
+  const libraryGroup = builder.build()
+  scene.add(libraryGroup)
+  const flameMats = libraryGroup.children
+    .filter((m) => m.name === 'flame')
+    .map((m) => (m as THREE.Mesh).material as THREE.MeshStandardMaterial)
 
   // Contact shadows where furniture meets the floor (one instanced draw call).
   const shadows = new THREE.InstancedMesh(
@@ -257,7 +262,8 @@ export async function createInterior(opts: InteriorOptions): Promise<InteriorHan
     scene.add(light)
     flickering.push({ light, base: intensity, seed: rand() * 100 })
   }
-  lib.chandeliers.forEach((c, i) => addCandleLight(c.clone().setY(c.y - 0.6), 55, 26, i === 0))
+  // No point-light shadows: each costs six extra scene renders; contact shadows ground the furniture.
+  lib.chandeliers.forEach((c) => addCandleLight(c.clone().setY(c.y - 0.6), 55, 26))
   for (const x of [-6.5, 6.5]) addCandleLight(new THREE.Vector3(x, 3.2, -9), 16, 9)
   addCandleLight(new THREE.Vector3(0, 6, -15), 20, 14)
   for (const x of [-10, 10]) addCandleLight(new THREE.Vector3(x, 6, -14), 18, 13)
@@ -356,6 +362,9 @@ export async function createInterior(opts: InteriorOptions): Promise<InteriorHan
       const t = time * timeScale + f.seed
       f.light.intensity = f.base * (0.88 + Math.sin(t * 9) * 0.05 + Math.sin(t * 23) * 0.04 + Math.sin(t * 3.1) * 0.03)
     }
+    // The flames themselves flicker slightly too.
+    const ft = time * timeScale
+    for (const m of flameMats) m.emissiveIntensity = 2.0 * (0.85 + Math.sin(ft * 13) * 0.08 + Math.sin(ft * 29) * 0.05)
     const k = Math.min(1, dt * 8)
     for (const [id, mat] of doorGlows) {
       const on = id === hovered || hovered === `plate:${id}`

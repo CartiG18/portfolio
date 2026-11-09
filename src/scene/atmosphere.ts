@@ -36,6 +36,8 @@ export function createMotes(o: MoteOptions, rand: () => number): THREE.Points<TH
       uTime: { value: 0 },
       uSize: { value: o.size },
       uDrift: { value: o.drift },
+      uFocus: { value: new THREE.Vector3() },
+      uFocusStrength: { value: 0 },
       uColor: { value: new THREE.Vector3(...o.color) },
       uPixelRatio: { value: Math.min(window.devicePixelRatio, 2) },
     },
@@ -44,6 +46,8 @@ export function createMotes(o: MoteOptions, rand: () => number): THREE.Points<TH
       uniform float uSize;
       uniform float uPixelRatio;
       uniform float uDrift;
+      uniform vec3 uFocus;
+      uniform float uFocusStrength;
       attribute float aPhase;
       varying float vGlow;
       void main() {
@@ -58,6 +62,9 @@ export function createMotes(o: MoteOptions, rand: () => number): THREE.Points<TH
         // Slow pulse, with each firefly occasionally going dark.
         float pulse = 0.5 + 0.5 * sin(t * 1.7);
         vGlow = smoothstep(0.15, 1.0, pulse);
+        // Motes near the exhibit in focus catch more light.
+        float near = 1.0 - smoothstep(0.5, 3.5, distance((modelMatrix * vec4(p, 1.0)).xyz, uFocus));
+        vGlow *= 1.0 + uFocusStrength * near * 2.5;
       }
     `,
     fragmentShader: /* glsl */ `
