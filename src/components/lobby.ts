@@ -42,7 +42,7 @@ export function renderLobby(): string {
 
 export async function mountLobby(
   root: HTMLElement,
-  opts: { reducedMotion: boolean; onEnterExhibit(id: string): void },
+  opts: { reducedMotion: boolean; returnFrom?: string; onEnterExhibit(id: string): void },
 ): Promise<SceneController & { enterExhibit?(id: string): void }> {
   const canvas = root.querySelector<HTMLCanvasElement>('canvas')!
   const fade = root.querySelector<HTMLElement>('[data-fade]')!
@@ -65,6 +65,7 @@ export async function mountLobby(
     const scene = await createInterior({
       canvas,
       reducedMotion: opts.reducedMotion,
+      returnFrom: opts.returnFrom,
       onDoorProgress(t) {
         document.body.classList.add('is-travelling')
         fade.style.opacity = String(Math.max(0, (t - 0.5) / 0.5))

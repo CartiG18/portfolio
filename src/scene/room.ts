@@ -134,6 +134,8 @@ export async function createExhibitRoom(opts: RoomOptions): Promise<RoomHandle> 
   for (const it of piece.items) stage.addPickable({ id: it.id, object: it.hit })
 
   let openId: string | null = null
+  /** A close requested while the camera was still moving in; run it on arrival. */
+  let pendingClose = false
   let interacted = false
   const firstInteraction = () => {
     if (interacted) return
@@ -172,12 +174,21 @@ export async function createExhibitRoom(opts: RoomOptions): Promise<RoomHandle> 
       lookAt: it.view.target,
       duration: 1.3,
       end: 'hold',
-      onDone: () => {},
+      onDone: () => {
+        if (pendingClose) {
+          pendingClose = false
+          close()
+        }
+      },
     })
   }
 
   function close(): void {
-    if (!openId || stage.isFlying) return
+    if (!openId) return
+    if (stage.isFlying) {
+      pendingClose = true
+      return
+    }
     for (const it of piece.items) it.wantActive = false
     openId = null
     opts.onOpenChange(null)

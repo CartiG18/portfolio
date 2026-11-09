@@ -128,16 +128,21 @@ export async function mountExhibit(
   const panel = root.querySelector<HTMLElement>('[data-panel]')!
   const buttons = [...root.querySelectorAll<HTMLButtonElement>('[data-item]')]
   let lastButton: HTMLButtonElement | null = null
+  let focusTimer = 0
   let room: { open(id: string): void; close(): void; highlight(id: string | null): void; dispose(): void } | null = null
 
   function showEntry(id: string | null): void {
+    window.clearTimeout(focusTimer)
     panel.classList.toggle('is-closed', id === null)
+    // A closed panel is visually hidden; keep its controls out of the tab order too.
+    // (Without WebGL the panel is the page, so it stays interactive.)
+    panel.inert = id === null && !root.classList.contains('no-webgl')
     for (const s of panel.querySelectorAll<HTMLElement>('[data-entry]')) s.classList.toggle('is-active', s.dataset.entry === id)
     for (const b of buttons) b.setAttribute('aria-expanded', String(b.dataset.item === id))
     if (id) {
       const section = panel.querySelector<HTMLElement>(`[data-entry="${CSS.escape(id)}"]`)
       // Let the camera arrive before moving focus so the panel doesn't steal the moment.
-      window.setTimeout(() => section?.focus({ preventScroll: true }), opts.reducedMotion ? 0 : 600)
+      focusTimer = window.setTimeout(() => section?.focus({ preventScroll: true }), opts.reducedMotion ? 0 : 600)
     } else {
       lastButton?.focus({ preventScroll: true })
     }
@@ -185,9 +190,11 @@ export async function mountExhibit(
     console.warn('3D scene unavailable; showing the exhibit as text.', error)
     root.classList.add('no-webgl')
   }
+  panel.inert = !root.classList.contains('no-webgl')
 
   return {
     dispose() {
+      window.clearTimeout(focusTimer)
       document.removeEventListener('keydown', onKey)
       closeBtn.removeEventListener('click', onClose)
       for (const b of buttons) {

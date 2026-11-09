@@ -37,6 +37,8 @@ function routeHref(route: Route): string {
 }
 
 let currentView: Route['view'] | null = null
+/** The exhibit we're leaving, so the hall can walk us back from its door. */
+let lastExhibit: string | null = null
 let scene: (SceneController & { enterExhibit?(id: string): void }) | null = null
 let renderToken = 0
 
@@ -65,6 +67,7 @@ function render(route: Route): void {
     const root = main.querySelector<HTMLElement>('[data-scene]')!
     void mountLobby(root, {
       reducedMotion: REDUCED_MOTION.matches,
+      returnFrom: currentView === 'exhibit' ? (lastExhibit ?? undefined) : undefined,
       onEnterExhibit: (id) => (location.hash = `#/${id}`),
     }).then(adopt)
   } else {
@@ -91,6 +94,7 @@ function render(route: Route): void {
     heading?.focus({ preventScroll: true })
   }
   currentView = route.view
+  lastExhibit = route.view === 'exhibit' ? route.id : null
 }
 
 function renderMap(): void {

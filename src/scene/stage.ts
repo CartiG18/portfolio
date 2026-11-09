@@ -51,6 +51,10 @@ export interface Flight {
    * 'hold' keeps the camera at the end pose, 'resume' returns to normal cursor-driven framing.
    */
   end?: 'exit' | 'hold' | 'resume'
+  /** Head-bob amplitude for walking flights (world units). Kept small; 0 = no bob. */
+  bob?: number
+  /** Start pose; defaults to wherever the camera is now. */
+  from?: { position: THREE.Vector3; lookAt: THREE.Vector3 }
 }
 
 const easeInOutCubic = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2)
@@ -164,6 +168,11 @@ export class Stage {
       return
     }
     this.held = null
+    if (flight.from) {
+      this.camera.position.copy(flight.from.position)
+      this.lookAt.copy(flight.from.lookAt)
+      this.camera.lookAt(this.lookAt)
+    }
     const curve = flight.curve as THREE.CubicBezierCurve3
     if ('v0' in curve) curve.v0.copy(this.camera.position)
     this.flight = {
@@ -259,6 +268,11 @@ export class Stage {
       const raw = Math.min(1, (time - f.start) / f.duration)
       const t = easeInOutCubic(raw)
       this.camera.position.copy(f.curve.getPoint(t))
+      if (f.bob) {
+        // About two steps per world unit walked, fading in and out with the walk.
+        const steps = Math.max(2, Math.round(f.curve.getLength() * 0.55))
+        this.camera.position.y += Math.abs(Math.sin(t * Math.PI * steps)) * f.bob * Math.sin(t * Math.PI)
+      }
       this.lookAt.lerpVectors(f.lookFrom, f.lookAt, Math.min(1, t * 1.3))
       this.camera.lookAt(this.lookAt)
       f.onProgress?.(raw)

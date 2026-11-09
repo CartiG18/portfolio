@@ -13,6 +13,8 @@ import { SOCIAL_ICON_PATHS } from '../data/icons.ts'
 export interface InteriorOptions {
   canvas: HTMLCanvasElement
   reducedMotion: boolean
+  /** Arriving back from an exhibit: start at its doorway and walk back to the entrance. */
+  returnFrom?: string
   /** A shelf book was pulled out (note + where it is on screen) or put back (null). */
   onBookNote?(note: { text: string; source: string } | null, screen?: { x: number; y: number }): void
   onDoorProgress(t: number): void
@@ -394,13 +396,38 @@ export async function createInterior(opts: InteriorOptions): Promise<InteriorHan
     stage.fly({
       curve: new THREE.CubicBezierCurve3(new THREE.Vector3(), firstStep, approach, end),
       lookAt: door.center,
-      duration: 2.2,
+      duration: 1.5,
+      bob: 0.05,
       onProgress: opts.onDoorProgress,
       onDone: () => opts.onEnterExhibit(id),
     })
   }
 
   stage.start()
+
+  // Walking back into the hall from an exhibit: turn away from its door and return to the entrance.
+  const back = opts.returnFrom ? lib.doors.find((d) => d.id === opts.returnFrom) : undefined
+  if (back) {
+    const eye = 3.3
+    const home = stage.home
+    const atDoor = back.center.clone().addScaledVector(back.normal, 2.2).setY(eye)
+    const approach = back.center.clone().addScaledVector(back.normal, 5).setY(eye)
+    stage.fly({
+      from: { position: atDoor, lookAt: atDoor.clone().addScaledVector(back.normal, 6) },
+      curve: new THREE.CubicBezierCurve3(
+        new THREE.Vector3(),
+        approach,
+        new THREE.Vector3(0, eye, Math.min(-2, approach.z * 0.75)),
+        home.position,
+      ),
+      lookAt: home.target,
+      duration: 1.5,
+      bob: 0.05,
+      end: 'resume',
+      onDone: () => {},
+    })
+  }
+
   return {
     enterExhibit,
     pullNextBook: () => setBook(pulledBook === null ? 0 : (pulledBook + 1) % books.length),
