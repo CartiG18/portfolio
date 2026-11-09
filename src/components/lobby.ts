@@ -36,8 +36,28 @@ export function renderLobby(): string {
       <section class="visually-hidden" aria-label="Notes found in the library's books">
         <ul>${notes}</ul>
       </section>
+      <p class="scene-hint" data-hint aria-hidden="true">Explore the exhibits</p>
       <div class="scene-view__fade" data-fade></div>
     </div>`
+}
+
+/** Fade a hint out after the visitor's first real interaction with the view. */
+export function fadeHintOnInteraction(root: HTMLElement): () => void {
+  const hint = root.querySelector<HTMLElement>('[data-hint]')
+  if (!hint) return () => {}
+  const done = () => {
+    hint.classList.add('is-faded')
+    cleanup()
+  }
+  const cleanup = () => {
+    root.removeEventListener('pointerdown', done)
+    root.removeEventListener('keydown', done)
+    window.clearTimeout(timer)
+  }
+  root.addEventListener('pointerdown', done)
+  root.addEventListener('keydown', done)
+  const timer = window.setTimeout(done, 12000)
+  return cleanup
 }
 
 export async function mountLobby(
@@ -74,6 +94,15 @@ export async function mountLobby(
       onBookNote: showNote,
     })
     const onPull = () => scene.pullNextBook()
+    const stopHint = fadeHintOnInteraction(root)
+    // Keyboard focus on a door link lights that door and plaque, like hovering it.
+    const doorLinks = [...root.querySelectorAll<HTMLAnchorElement>('a[data-door]')]
+    const onFocus = (e: Event) => scene.highlight((e.currentTarget as HTMLElement).dataset.door!)
+    const onBlur = () => scene.highlight(null)
+    for (const a of doorLinks) {
+      a.addEventListener('focus', onFocus)
+      a.addEventListener('blur', onBlur)
+    }
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && !note.hidden) scene.putBookBack()
     }
@@ -84,6 +113,11 @@ export async function mountLobby(
       enterExhibit: (id) => scene.enterExhibit(id),
       dispose: () => {
         pullButton.removeEventListener('click', onPull)
+        stopHint()
+        for (const a of doorLinks) {
+          a.removeEventListener('focus', onFocus)
+          a.removeEventListener('blur', onBlur)
+        }
         document.removeEventListener('keydown', onKey)
         scene.dispose()
       },

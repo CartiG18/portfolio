@@ -25,6 +25,8 @@ export interface InteriorOptions {
 
 export interface InteriorHandle {
   enterExhibit(id: string): void
+  /** Light a door and its plaque from outside the canvas (keyboard focus). */
+  highlight(id: string | null): void
   /** Pull the next featured book (keyboard equivalent of clicking one). */
   pullNextBook(): void
   putBookBack(): void
@@ -443,6 +445,7 @@ export async function createInterior(opts: InteriorOptions): Promise<InteriorHan
 
   return {
     enterExhibit,
+    highlight: (id) => stage.highlight(id),
     pullNextBook: () => setBook(pulledBook === null ? 0 : (pulledBook + 1) % books.length),
     putBookBack: () => setBook(null),
     dispose: () => stage.dispose(),

@@ -8,6 +8,7 @@ import {
   timeline,
 } from '../data/content.ts'
 import { esc } from './html.ts'
+import { fadeHintOnInteraction } from './lobby.ts'
 
 /** Shown wherever an exhibit's real content hasn't been provided yet. */
 const NOTICE = `
@@ -99,6 +100,7 @@ export function renderExhibit(exhibit: Exhibit): string {
           )
           .join('')}
       </aside>
+      <p class="scene-hint" data-hint aria-hidden="true">Click to examine · Esc to step back</p>
       <div class="scene-view__fade" data-fade></div>
     </div>`
 }
@@ -176,6 +178,7 @@ export async function mountExhibit(
     }
   }
   document.addEventListener('keydown', onKey)
+  const stopHint = fadeHintOnInteraction(root)
 
   try {
     const { createExhibitRoom } = await import('../scene/room.ts')
@@ -195,6 +198,7 @@ export async function mountExhibit(
   return {
     dispose() {
       window.clearTimeout(focusTimer)
+      stopHint()
       document.removeEventListener('keydown', onKey)
       closeBtn.removeEventListener('click', onClose)
       for (const b of buttons) {
