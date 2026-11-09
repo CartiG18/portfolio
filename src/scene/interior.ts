@@ -5,6 +5,7 @@ import { buildLibrary, LIBRARY_STYLES } from './library.ts'
 import { createMotes } from './atmosphere.ts'
 import { contactShadowTexture, doorGlowTexture, ensureFonts, placardTexture, portraitTexture } from './labels.ts'
 import { findExhibit } from '../data/exhibits.ts'
+import { ACCENT } from './palette.ts'
 import { socialLinks } from '../data/site.ts'
 import { SOCIAL_ICON_PATHS } from '../data/icons.ts'
 
@@ -74,7 +75,9 @@ export async function createInterior(opts: InteriorOptions): Promise<InteriorHan
     const exhibit = findExhibit(door.id)!
     const facing = Math.atan2(door.normal.x, door.normal.z)
 
+    // Hover is an interactive state, so the light from beyond takes the cool accent.
     const glowMat = new THREE.MeshBasicMaterial({
+      color: ACCENT,
       map: glowTexture,
       transparent: true,
       opacity: 0,
@@ -181,7 +184,7 @@ export async function createInterior(opts: InteriorOptions): Promise<InteriorHan
       f.light.intensity = f.base * (0.88 + Math.sin(t * 9) * 0.05 + Math.sin(t * 23) * 0.04 + Math.sin(t * 3.1) * 0.03)
     }
     for (const [id, mat] of doorGlows) {
-      const target = id === hovered ? 0.9 : 0
+      const target = id === hovered ? 0.75 : 0
       mat.opacity += (target - mat.opacity) * Math.min(1, dt * 8)
       mat.visible = mat.opacity > 0.01
     }

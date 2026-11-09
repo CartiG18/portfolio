@@ -30,7 +30,7 @@ a {
 }
 
 :focus-visible {
-  outline: 3px solid var(--gold-light);
+  outline: 2px solid var(--accent);
   outline-offset: 4px;
 }
 
@@ -184,8 +184,8 @@ body.is-travelling .site-header {
 
 .map a:hover,
 .map a:focus-visible {
-  background: rgb(var(--glow) / 0.12);
-  color: #fff4d6;
+  background: rgb(143 211 223 / 0.1);
+  color: var(--accent);
 }
 
 .map a[aria-current='page'] {

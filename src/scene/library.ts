@@ -8,30 +8,31 @@ export const LIBRARY_STYLES: Record<string, BlockStyle> = {
   floorB: { color: 0x3e2515, jitter: 0.1, castShadow: false, texture: 'planks', roughness: 0.7, floorAO: true },
   wainscot: { color: 0x34200f, jitter: 0.06, texture: 'grain', roughness: 0.6, floorAO: true },
   trimWood: { color: 0x553319, jitter: 0.06, texture: 'grain', roughness: 0.55 },
-  maroon: { color: 0x48161b, jitter: 0.04, texture: 'damask', texScale: 0.5, roughness: 0.9, floorAO: true },
+  maroon: { color: 0x4a1418, jitter: 0.04, texture: 'damask', texScale: 0.5, roughness: 0.9, floorAO: true },
   crown: { color: 0x452816, jitter: 0.06, texture: 'grain', roughness: 0.55 },
   woodDark: { color: 0x2e1a0e, jitter: 0.08, texture: 'grain', roughness: 0.6, floorAO: true },
   shelfBoard: { color: 0x5e3a1d, jitter: 0.08, texture: 'grain', roughness: 0.6 },
   tableWood: { color: 0x5a331b, jitter: 0.05, texture: 'grain', texScale: 2, roughness: 0.45, floorAO: true },
-  leather: { color: 0x5c1a1a, jitter: 0.08, texture: 'leather', texScale: 2, roughness: 0.55 },
-  carpet: { color: 0x4a1015, jitter: 0.04, castShadow: false, texture: 'carpet', texScale: 2, roughness: 1 },
-  carpetGold: { color: 0x9a7330, jitter: 0.04, castShadow: false, texture: 'carpet', texScale: 4, roughness: 0.9 },
-  brass: { color: 0xc9a14a, emissive: 0x3a2604, emissiveIntensity: 0.4, jitter: 0.06, texture: 'brass', texScale: 4, roughness: 0.35, metalness: 0.8 },
-  goldFoil: { color: 0xe8c066, emissive: 0x7a5410, emissiveIntensity: 0.9, castShadow: false, roughness: 0.3, metalness: 0.9 },
-  wax: { color: 0xf1e6c8, jitter: 0.05, castShadow: false, texture: 'paper', texScale: 4, roughness: 0.8 },
+  leather: { color: 0x5a1519, jitter: 0.08, texture: 'leather', texScale: 2, roughness: 0.55 },
+  carpet: { color: 0x4f1216, jitter: 0.04, castShadow: false, texture: 'carpet', texScale: 2, roughness: 1 },
+  carpetGold: { color: 0x9a7a3e, jitter: 0.04, castShadow: false, texture: 'carpet', texScale: 4, roughness: 0.9 },
+  brass: { color: 0xb08d4a, emissive: 0x2e1f06, emissiveIntensity: 0.4, jitter: 0.06, texture: 'brass', texScale: 4, roughness: 0.35, metalness: 0.8 },
+  goldFoil: { color: 0xd8b56a, emissive: 0x7a5410, emissiveIntensity: 0.9, castShadow: false, roughness: 0.3, metalness: 0.9 },
+  wax: { color: 0xefe3c4, jitter: 0.05, castShadow: false, texture: 'paper', texScale: 4, roughness: 0.8 },
   flame: { color: 0xffd27a, emissive: 0xff9a2a, emissiveIntensity: 2.0, castShadow: false },
-  greenGlass: { color: 0x2f7a4a, emissive: 0x1f8a4a, emissiveIntensity: 1.6, castShadow: false },
-  bookRed: { color: 0x9a2a26, jitter: 0.3, texture: 'leather', texScale: 3, roughness: 0.7 },
-  bookGreen: { color: 0x2d6a45, jitter: 0.3, texture: 'leather', texScale: 3, roughness: 0.7 },
-  bookNavy: { color: 0x2c3f70, jitter: 0.3, texture: 'leather', texScale: 3, roughness: 0.7 },
+  shade: { color: 0xefe3c4, emissive: 0xffb866, emissiveIntensity: 1.1, castShadow: false, texture: 'paper', texScale: 4 },
+  bookRed: { color: 0x7e2022, jitter: 0.3, texture: 'leather', texScale: 3, roughness: 0.7 },
+  bookUmber: { color: 0x5a331b, jitter: 0.3, texture: 'leather', texScale: 3, roughness: 0.7 },
+  bookBurgundy: { color: 0x6a1c20, jitter: 0.3, texture: 'leather', texScale: 3, roughness: 0.7 },
   bookBrown: { color: 0x7d5228, jitter: 0.3, texture: 'leather', texScale: 3, roughness: 0.7 },
-  bookOchre: { color: 0xb88431, jitter: 0.3, texture: 'leather', texScale: 3, roughness: 0.7 },
+  bookTan: { color: 0x9a6f3a, jitter: 0.3, texture: 'leather', texScale: 3, roughness: 0.7 },
   bookBlack: { color: 0x2e2925, jitter: 0.3, texture: 'leather', texScale: 3, roughness: 0.7 },
   beyond: { color: 0x030202, castShadow: false },
   ceiling: { color: 0x3a2214, jitter: 0.06, castShadow: false, texture: 'coffer', texScale: 0.5, roughness: 0.8 },
 }
 
-const BOOKS = ['bookRed', 'bookGreen', 'bookNavy', 'bookBrown', 'bookOchre', 'bookBlack', 'bookRed', 'bookBrown']
+// Warm leathers only: oxblood, burgundy, umber, brown, tan, black.
+const BOOKS = ['bookRed', 'bookBurgundy', 'bookUmber', 'bookBrown', 'bookTan', 'bookBlack', 'bookRed', 'bookBrown']
 
 /** Room extents (inner floor is x -13..13, z -18..0; walls at x ±14 and z -19). */
 const ROOM = { halfW: 14, back: -19, front: 1, height: 12, shelfTop: 9 }
@@ -270,7 +271,7 @@ export function buildLibrary(b: VoxelBuilder, rand: () => number): LibraryInfo {
     for (const z of [-11.5, -6.5]) {
       b.prop('brass', tx, 1.86, z, 0.36, 0.06, 0.36)
       b.prop('brass', tx, 2.12, z, 0.1, 0.5, 0.1)
-      b.prop('greenGlass', tx, 2.4, z, 0.85, 0.22, 0.42)
+      b.prop('shade', tx, 2.4, z, 0.85, 0.22, 0.42)
       b.prop('brass', tx, 2.52, z, 0.9, 0.03, 0.46)
     }
     for (const z of [-13, -9, -5]) {

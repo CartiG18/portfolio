@@ -104,5 +104,6 @@ body[data-view='lobby'] {
 
 .lobby-directory a:hover,
 .lobby-directory a:focus-visible {
-  background: rgb(255 206 102 / 0.12);
+  background: rgb(143 211 223 / 0.1);
+  color: var(--accent);
 }

@@ -29,6 +29,9 @@
   --void: #0d0908;
 
   --lamp-glow: rgb(255 214 150 / 0.28);
+
+  /* Interactive-only cool accent (hover, focus, selected). Mirrors ACCENT in src/scene/palette.ts. */
+  --accent: #8fd3df;
   --shade: rgb(0 0 0 / 0.45);
 
   /* Type */
