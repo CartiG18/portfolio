@@ -28,6 +28,7 @@ export const LIBRARY_STYLES: Record<string, BlockStyle> = {
   bookTan: { color: 0x9a6f3a, jitter: 0.3, texture: 'leather', texScale: 3, roughness: 0.7 },
   bookBlack: { color: 0x2e2925, jitter: 0.3, texture: 'leather', texScale: 3, roughness: 0.7 },
   beyond: { color: 0x030202, castShadow: false },
+  silhouette: { color: 0x0a0605, castShadow: false },
   ceiling: { color: 0x3a2214, jitter: 0.06, castShadow: false, texture: 'coffer', texScale: 0.5, roughness: 0.8 },
 }
 
@@ -64,8 +65,18 @@ export interface ContactShadow {
   d: number
 }
 
+/** The far end of the passage behind a door, where a warm glow hints at the room beyond. */
+export interface Passage {
+  id: ExhibitId
+  far: THREE.Vector3
+  normal: THREE.Vector3
+  width: number
+  height: number
+}
+
 export interface LibraryInfo {
   contactShadows: ContactShadow[]
+  passages: Passage[]
   doors: DoorSpot[]
   portraits: PortraitSpot[]
   chandeliers: THREE.Vector3[]
@@ -133,6 +144,7 @@ export function buildLibrary(b: VoxelBuilder, rand: () => number): LibraryInfo {
   const sconces: THREE.Vector3[] = []
   const shelfTops: Array<{ x: number; z: number }> = []
   const contactShadows: ContactShadow[] = []
+  const passages: Passage[] = []
 
   for (const wall of ['back', 'left', 'right'] as Wall[]) {
     const [u0, u1] = wallRange(wall)
@@ -142,13 +154,36 @@ export function buildLibrary(b: VoxelBuilder, rand: () => number): LibraryInfo {
     for (let u = u0; u <= u1; u++)
       for (let y = 1; y <= ROOM.height; y++) {
         const door = defs.find((d) => inOpening(d, u, y))
-        if (door) {
-          b.set('beyond', ...cell(wall, u, y, -1))
-          continue
-        }
+        if (door) continue // open: the passage beyond is built below
         const style = y <= 2 ? 'wainscot' : y === 3 ? 'trimWood' : y === ROOM.height ? 'crown' : 'maroon'
         b.set(style, ...cell(wall, u, y, 0))
       }
+
+    // ---------- Passages beyond each door: a short hall glowing at the far end ----------
+    for (const d of defs) {
+      const depth = 4
+      for (let k = -1; k >= -depth; k--) {
+        for (let u = d.at - d.halfWidth - 1; u <= d.at + d.halfWidth + 1; u++) {
+          b.set(u % 2 === 0 ? 'floorA' : 'floorB', ...cell(wall, u, 0, k))
+          b.set('ceiling', ...cell(wall, u, d.height + 1, k))
+        }
+        for (let y = 1; y <= d.height; y++) {
+          const style = y <= 2 ? 'wainscot' : 'maroon'
+          b.set(style, ...cell(wall, d.at - d.halfWidth - 1, y, k))
+          b.set(style, ...cell(wall, d.at + d.halfWidth + 1, y, k))
+        }
+      }
+      for (let u = d.at - d.halfWidth - 1; u <= d.at + d.halfWidth + 1; u++)
+        for (let y = 1; y <= d.height; y++) b.set('beyond', ...cell(wall, u, y, -depth - 1))
+      silhouetteFor(b, d, wall, -depth + 1)
+      passages.push({
+        id: d.id,
+        far: new THREE.Vector3(...cell(wall, d.at, 0.5 + d.height / 2, -depth)).addScaledVector(wallNormal(wall), -0.45),
+        normal: wallNormal(wall),
+        width: d.halfWidth * 2 + 1,
+        height: d.height,
+      })
+    }
 
     // ---------- Door frames ----------
     for (const d of defs) {
@@ -321,7 +356,7 @@ export function buildLibrary(b: VoxelBuilder, rand: () => number): LibraryInfo {
     b.prop('brass', frame.x, frame.y, frame.z, 0.12, 3.6, 2.9)
   }
 
-  return { contactShadows, doors, portraits, chandeliers, tableCandles, sconces }
+  return { contactShadows, passages, doors, portraits, chandeliers, tableCandles, sconces }
 }
 
 /** One shelf row: books of varied height and thickness, a few leaning, some with gold-foil bands. */
@@ -404,4 +439,54 @@ function chair(b: VoxelBuilder, x: number, z: number, side: number): void {
   for (const dz of [-0.36, 0.36]) b.prop('woodDark', bx, 1.85, z + dz, 0.1, 1.2, 0.1) // back posts
   b.prop('tableWood', bx, 2.42, z, 0.12, 0.1, 0.84) // top rail
   b.prop('leather', bx - side * 0.02, 1.9, z, 0.06, 0.8, 0.62) // padded back
+}
+
+/** A dark silhouette of each exhibit's centrepiece, seen against the glow down the passage. */
+function silhouetteFor(b: VoxelBuilder, d: DoorDef, wall: Wall, k: number): void {
+  const at = (du: number, y: number, dk = 0): [number, number, number] => {
+    const [x, , z] = cell(wall, d.at + du, 0, k + dk)
+    return [x, y, z]
+  }
+  const S = 'silhouette'
+  switch (d.id) {
+    case 'projects': // glass cases on plinths
+      for (const du of [-1.4, 0, 1.4]) {
+        const [x, , z] = at(du, 0)
+        b.prop(S, x, 1.0, z, 0.8, 1.0, 0.8)
+        b.prop(S, x, 1.85, z, 0.6, 0.7, 0.6)
+      }
+      break
+    case 'skills': {
+      // card catalog cabinet
+      const [x, , z] = at(0, 0)
+      b.prop(S, x, 2.0, z, 2.0, 3.0, 0.9)
+      break
+    }
+    case 'about': {
+      // writing desk and chair
+      const [x, , z] = at(0, 0)
+      b.prop(S, x, 1.4, z, 2.0, 0.15, 0.9)
+      b.prop(S, x - 0.8, 0.95, z, 0.15, 0.8, 0.7)
+      b.prop(S, x + 0.8, 0.95, z, 0.15, 0.8, 0.7)
+      b.prop(S, x, 1.9, z, 0.9, 0.9, 0.12)
+      break
+    }
+    case 'resume':
+    case 'cv': {
+      // lectern
+      const [x, , z] = at(0, 0)
+      b.prop(S, x, 1.3, z, 0.25, 1.6, 0.25)
+      b.prop(S, x, 2.15, z, 0.9, 0.12, 0.7)
+      b.prop(S, x, 0.55, z, 0.8, 0.12, 0.8)
+      break
+    }
+    case 'experience': {
+      // framed timeline on the far wall
+      for (const du of [-1, 0, 1]) {
+        const [x, , z] = at(du * 1.1, 0, -0.9)
+        b.prop(S, x, 3.2, z, 0.8, 1.0, 0.8)
+      }
+      break
+    }
+  }
 }

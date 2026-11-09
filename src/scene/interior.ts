@@ -113,6 +113,59 @@ export async function createInterior(opts: InteriorOptions): Promise<InteriorHan
     stage.addPickable({ id: door.id, object: hit })
   }
 
+  // ---------- Passages: warm light at the far end of each doorway ----------
+  const farGlow = new THREE.MeshBasicMaterial({
+    map: glowTexture,
+    color: 0xffb070,
+    transparent: true,
+    opacity: 0.55,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  })
+  for (const pass of lib.passages) {
+    const plane = new THREE.Mesh(new THREE.PlaneGeometry(pass.width + 2, pass.height + 0.6), farGlow)
+    plane.position.copy(pass.far).setY(0.5 + (pass.height + 0.6) / 2)
+    plane.rotation.y = Math.atan2(pass.normal.x, pass.normal.z)
+    scene.add(plane)
+  }
+
+  // ---------- Haze: light shafts catching the chandelier light ----------
+  const hazeMaterial = new THREE.ShaderMaterial({
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    side: THREE.DoubleSide,
+    uniforms: { uColor: { value: new THREE.Color(0xffb27a) }, uStrength: { value: 0.07 } },
+    vertexShader: /* glsl */ `
+      varying float vH;
+      varying float vFacing;
+      void main() {
+        vH = uv.y;
+        vec3 n = normalize(normalMatrix * normal);
+        vec4 mv = modelViewMatrix * vec4(position, 1.0);
+        vFacing = abs(dot(n, normalize(-mv.xyz)));
+        gl_Position = projectionMatrix * mv;
+      }
+    `,
+    fragmentShader: /* glsl */ `
+      uniform vec3 uColor;
+      uniform float uStrength;
+      varying float vH;
+      varying float vFacing;
+      void main() {
+        // Brightest near the chandelier, fading toward the floor and at the cone's silhouette.
+        float a = uStrength * smoothstep(0.0, 0.9, vH) * pow(vFacing, 1.5);
+        gl_FragColor = vec4(uColor * a, a);
+      }
+    `,
+  })
+  for (const c of lib.chandeliers) {
+    const h = c.y - 0.5
+    const cone = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 4.2, h, 24, 1, true), hazeMaterial)
+    cone.position.set(c.x, 0.5 + h / 2, c.z)
+    scene.add(cone)
+  }
+
   // ---------- Framed portraits linking out ----------
   for (const p of lib.portraits) {
     const link = socialLinks.find((l) => l.id === p.id)!
@@ -127,7 +180,8 @@ export async function createInterior(opts: InteriorOptions): Promise<InteriorHan
   }
 
   // ---------- Candlelight ----------
-  scene.add(new THREE.HemisphereLight(0x9a7a58, 0x1a100a, 0.9))
+  // Warm bounce from below lights the ceiling and beams.
+  scene.add(new THREE.HemisphereLight(0x9a7a58, 0x6a4428, 0.9))
   const fill = new THREE.DirectionalLight(0xffc890, 0.35)
   fill.position.set(6, 30, 20)
   scene.add(fill)
