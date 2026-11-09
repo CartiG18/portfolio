@@ -1,17 +1,20 @@
 import * as THREE from 'three'
 import { Stage } from './stage.ts'
-import { mulberry32, VoxelBuilder } from './voxels.ts'
+import { mulberry32, texturedMaterial, VoxelBuilder } from './voxels.ts'
 import { buildLibrary, LIBRARY_STYLES } from './library.ts'
 import { createMotes } from './atmosphere.ts'
-import { contactShadowTexture, doorGlowTexture, ensureFonts, placardTexture, portraitTexture } from './labels.ts'
+import { contactShadowTexture, doorGlowTexture, ensureFonts, placardTexture, portraitTexture, softGlowTexture } from './labels.ts'
 import { findExhibit } from '../data/exhibits.ts'
-import { ACCENT } from './palette.ts'
+import { ACCENT, PALETTE } from './palette.ts'
 import { socialLinks } from '../data/site.ts'
+import { bookNotes } from '../data/content.ts'
 import { SOCIAL_ICON_PATHS } from '../data/icons.ts'
 
 export interface InteriorOptions {
   canvas: HTMLCanvasElement
   reducedMotion: boolean
+  /** A shelf book was pulled out (note + where it is on screen) or put back (null). */
+  onBookNote?(note: { text: string; source: string } | null, screen?: { x: number; y: number }): void
   onDoorProgress(t: number): void
   /** The camera has reached an exhibit door. */
   onEnterExhibit(id: string): void
@@ -19,6 +22,9 @@ export interface InteriorOptions {
 
 export interface InteriorHandle {
   enterExhibit(id: string): void
+  /** Pull the next featured book (keyboard equivalent of clicking one). */
+  pullNextBook(): void
+  putBookBack(): void
   dispose(): void
 }
 
@@ -71,6 +77,30 @@ export async function createInterior(opts: InteriorOptions): Promise<InteriorHan
   // ---------- Doors: glowing openings, brass placards, hit boxes ----------
   const doorGlows = new Map<string, THREE.MeshBasicMaterial>()
   const glowTexture = doorGlowTexture()
+  const plates = new Map<string, THREE.MeshBasicMaterial>()
+  const halos = new Map<string, THREE.MeshBasicMaterial>()
+  const haloMaterial = new THREE.MeshBasicMaterial({
+    color: ACCENT,
+    map: softGlowTexture(),
+    transparent: true,
+    opacity: 0,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  })
+  const brassMat = texturedMaterial({ ...LIBRARY_STYLES.brass })
+  brassMat.color.setHex(PALETTE.brass)
+  const bulbMat = new THREE.MeshBasicMaterial({ color: 0xffe2b0 })
+  const washMat = new THREE.MeshBasicMaterial({
+    map: glowTexture,
+    color: 0xffc890,
+    transparent: true,
+    opacity: 0.16,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  })
+  washMat.map = glowTexture.clone()
+  washMat.map.rotation = Math.PI // bright at the top, under the lamp
+  washMat.map.center.set(0.5, 0.5)
   for (const door of lib.doors) {
     const exhibit = findExhibit(door.id)!
     const facing = Math.atan2(door.normal.x, door.normal.z)
@@ -102,6 +132,30 @@ export async function createInterior(opts: InteriorOptions): Promise<InteriorHan
       .addScaledVector(door.normal, 1.02)
     plate.rotation.y = facing
     scene.add(plate)
+    plates.set(door.id, plate.material as THREE.MeshBasicMaterial)
+    stage.addPickable({ id: door.id, object: plate })
+
+    // Accent halo behind the plaque, shown on hover.
+    const halo = new THREE.Mesh(new THREE.PlaneGeometry(plateWidth + 0.5, plateWidth * 0.29 + 0.4), haloMaterial.clone())
+    halo.position.copy(plate.position).addScaledVector(door.normal, -0.02)
+    halo.rotation.y = facing
+    scene.add(halo)
+    halos.set(door.id, halo.material as THREE.MeshBasicMaterial)
+
+    // Picture light: a brass bar above the plaque washing it with warm light.
+    const barPos = plate.position.clone().add(new THREE.Vector3(0, plateWidth * 0.145 + 0.35, 0)).addScaledVector(door.normal, 0.28)
+    const bar = new THREE.Mesh(new THREE.BoxGeometry(plateWidth * 0.55, 0.12, 0.16), brassMat)
+    bar.position.copy(barPos)
+    bar.rotation.y = facing
+    scene.add(bar)
+    const bulb = new THREE.Mesh(new THREE.BoxGeometry(plateWidth * 0.5, 0.03, 0.05), bulbMat)
+    bulb.position.copy(barPos).add(new THREE.Vector3(0, -0.07, 0)).addScaledVector(door.normal, 0.05)
+    bulb.rotation.y = facing
+    scene.add(bulb)
+    const wash = new THREE.Mesh(new THREE.PlaneGeometry(plateWidth + 0.6, plateWidth * 0.29 + 0.9), washMat)
+    wash.position.copy(plate.position).add(new THREE.Vector3(0, 0.15, 0)).addScaledVector(door.normal, 0.01)
+    wash.rotation.y = facing
+    scene.add(wash)
 
     const hit = new THREE.Mesh(
       new THREE.BoxGeometry(door.width + 1, door.height + 2.5, 0.6),
@@ -122,8 +176,11 @@ export async function createInterior(opts: InteriorOptions): Promise<InteriorHan
     depthWrite: false,
     blending: THREE.AdditiveBlending,
   })
+  const farGlows = new Map<string, THREE.MeshBasicMaterial>()
   for (const pass of lib.passages) {
-    const plane = new THREE.Mesh(new THREE.PlaneGeometry(pass.width + 2, pass.height + 0.6), farGlow)
+    const mat = farGlow.clone()
+    farGlows.set(pass.id, mat)
+    const plane = new THREE.Mesh(new THREE.PlaneGeometry(pass.width + 2, pass.height + 0.6), mat)
     plane.position.copy(pass.far).setY(0.5 + (pass.height + 0.6) / 2)
     plane.rotation.y = Math.atan2(pass.normal.x, pass.normal.z)
     scene.add(plane)
@@ -218,10 +275,67 @@ export async function createInterior(opts: InteriorOptions): Promise<InteriorHan
   )
   scene.add(motes)
 
+  // ---------- Featured books: pull one out to find a note tucked inside ----------
+  const bookSpots: Array<[THREE.Vector3, THREE.Vector3, THREE.Vector3]> = [
+    // [cell centre, wall normal (into room), along-wall axis]
+    [new THREE.Vector3(-12, 4, -18), new THREE.Vector3(0, 0, 1), new THREE.Vector3(1, 0, 0)],
+    [new THREE.Vector3(5, 3, -18), new THREE.Vector3(0, 0, 1), new THREE.Vector3(1, 0, 0)],
+    [new THREE.Vector3(12, 5, -18), new THREE.Vector3(0, 0, 1), new THREE.Vector3(1, 0, 0)],
+    [new THREE.Vector3(-13, 4, -17), new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 0, 1)],
+    [new THREE.Vector3(-13, 3, -9), new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 0, 1)],
+    [new THREE.Vector3(13, 4, -17), new THREE.Vector3(-1, 0, 0), new THREE.Vector3(0, 0, 1)],
+  ]
+  const bookMat = texturedMaterial({ ...LIBRARY_STYLES.bookRed })
+  bookMat.color.setHex(PALETTE.oxbloodBright)
+  const books = bookSpots.slice(0, bookNotes.length).map(([c, n, along], i) => {
+    const group = new THREE.Group()
+    const depth = 0.66
+    const home = c.clone().setY(c.y - 0.4 + 0.42).addScaledVector(n, -0.45 + depth / 2 + 0.12)
+    group.position.copy(home)
+    group.rotation.y = Math.atan2(n.x, n.z)
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.84, depth), bookMat)
+    body.castShadow = true
+    group.add(body)
+    const foil = texturedMaterial({ ...LIBRARY_STYLES.goldFoil })
+    foil.color.setHex(PALETTE.brassBright)
+    for (const y of [-0.28, 0.26]) {
+      const band = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.05, 0.012), foil)
+      band.position.set(0, y, depth / 2 + 0.006)
+      group.add(band)
+    }
+    scene.add(group)
+    stage.addPickable({ id: `book:${i}`, object: group })
+    void along
+    return { group, home, normal: n, foil, hover: 0, pull: 0 }
+  })
+  let pulledBook: number | null = null
+
+  function setBook(index: number | null): void {
+    pulledBook = index
+    if (index === null) {
+      opts.onBookNote?.(null)
+      return
+    }
+    const b = books[index]
+    const screen = b.home.clone().addScaledVector(b.normal, 0.6).project(stage.camera)
+    const rect = opts.canvas.getBoundingClientRect()
+    opts.onBookNote?.(bookNotes[index], {
+      x: rect.left + ((screen.x + 1) / 2) * rect.width,
+      y: rect.top + ((1 - screen.y) / 2) * rect.height,
+    })
+  }
+
   // ---------- Interaction ----------
   let hovered: string | null = null
   stage.onHover = (id) => (hovered = id)
   stage.onPick = (id) => {
+    if (id.startsWith('book:')) {
+      const i = Number(id.slice(5))
+      setBook(pulledBook === i ? null : i)
+      return
+    }
+    if (pulledBook !== null) setBook(null)
+    if (!id) return
     if (id.startsWith('link:')) {
       const link = socialLinks.find((l) => `link:${l.id}` === id)
       if (link?.href) window.open(link.href, '_blank', 'noopener,noreferrer')
@@ -230,6 +344,9 @@ export async function createInterior(opts: InteriorOptions): Promise<InteriorHan
     enterExhibit(id)
   }
 
+  const plateBase = new THREE.Color(0xffffff)
+  const plateHover = new THREE.Color(0xe6f6f8)
+  const accentColor = new THREE.Color(ACCENT)
   const timeScale = opts.reducedMotion ? 0.3 : 1
   stage.addTicker((time, dt) => {
     motes.material.uniforms.uTime.value = time * timeScale
@@ -237,17 +354,37 @@ export async function createInterior(opts: InteriorOptions): Promise<InteriorHan
       const t = time * timeScale + f.seed
       f.light.intensity = f.base * (0.88 + Math.sin(t * 9) * 0.05 + Math.sin(t * 23) * 0.04 + Math.sin(t * 3.1) * 0.03)
     }
+    const k = Math.min(1, dt * 8)
     for (const [id, mat] of doorGlows) {
-      const target = id === hovered ? 0.75 : 0
-      mat.opacity += (target - mat.opacity) * Math.min(1, dt * 8)
+      const on = id === hovered || hovered === `plate:${id}`
+      mat.opacity += ((on ? 0.4 : 0) - mat.opacity) * k
       mat.visible = mat.opacity > 0.01
+      // Dim the warm passage light behind a hovered door so the cool accent reads cleanly.
+      const far = farGlows.get(id)
+      if (far) far.opacity += ((on ? 0 : 0.55) - far.opacity) * k
     }
+    // Plaques pick up a soft accent glow and tint when their door is hovered.
+    for (const [id, mat] of halos) {
+      const on = id === hovered ? 1 : 0
+      mat.opacity += (on * 0.55 - mat.opacity) * k
+      mat.visible = mat.opacity > 0.01
+      plates.get(id)!.color.lerpColors(plateBase, plateHover, mat.opacity / 0.55)
+    }
+    books.forEach((b, i) => {
+      b.hover += ((hovered === `book:${i}` ? 1 : 0) - b.hover) * k
+      b.pull += ((pulledBook === i ? 1 : 0) - b.pull) * Math.min(1, dt * 5)
+      b.group.position.copy(b.home).addScaledVector(b.normal, b.hover * 0.1 + b.pull * 0.45)
+      b.group.rotation.z = b.pull * 0.12
+      b.foil.emissive.set(0x7a5410).lerp(accentColor, Math.max(b.hover, b.pull))
+      b.foil.emissiveIntensity = 0.6 + Math.max(b.hover, b.pull) * 0.8
+    })
   })
 
   function enterExhibit(id: string): void {
     const door = lib.doors.find((d) => d.id === id)
     if (!door) return
     hovered = null
+    if (pulledBook !== null) setBook(null)
     // Walk at eye level: turn toward the door, approach it head-on, then step through.
     const eye = 3.3
     const approach = door.center.clone().addScaledVector(door.normal, 5).setY(eye)
@@ -264,5 +401,10 @@ export async function createInterior(opts: InteriorOptions): Promise<InteriorHan
   }
 
   stage.start()
-  return { enterExhibit, dispose: () => stage.dispose() }
+  return {
+    enterExhibit,
+    pullNextBook: () => setBook(pulledBook === null ? 0 : (pulledBook + 1) % books.length),
+    putBookBack: () => setBook(null),
+    dispose: () => stage.dispose(),
+  }
 }

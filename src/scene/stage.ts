@@ -46,6 +46,11 @@ export interface Flight {
   duration: number
   onProgress?(t: number): void
   onDone(): void
+  /**
+   * What happens when the flight ends: 'exit' stops rendering (the view is about to change),
+   * 'hold' keeps the camera at the end pose, 'resume' returns to normal cursor-driven framing.
+   */
+  end?: 'exit' | 'hold' | 'resume'
 }
 
 const easeInOutCubic = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2)
@@ -75,6 +80,7 @@ export class Stage {
   private pointerInside = false
   private pointerDirty = false
   private flight: (Flight & { start: number; lookFrom: THREE.Vector3 }) | null = null
+  private held: { position: THREE.Vector3; lookAt: THREE.Vector3 } | null = null
   private tickers: Array<(time: number, dt: number) => void> = []
   private frame = 0
   private resizeObserver: ResizeObserver
@@ -126,15 +132,38 @@ export class Stage {
     return this.flight !== null
   }
 
+  get isHeld(): boolean {
+    return this.held !== null
+  }
+
+  /** The resting eye position and look target (where cursor framing is centred). */
+  get home(): { position: THREE.Vector3; target: THREE.Vector3 } {
+    return { position: this.basePos.clone(), target: this.opts.camera.target.clone() }
+  }
+
+  /** Current look target, e.g. to start a flight from where the camera is pointing. */
+  get currentLookAt(): THREE.Vector3 {
+    return this.lookAt.clone()
+  }
+
+  /** Highlight an item from outside the canvas (e.g. a focused keyboard button). */
+  highlight(id: string | null): void {
+    this.setHover(id)
+  }
+
   /** Fly the camera along a curve (its first point is replaced by the current position). */
   fly(flight: Flight): void {
     if (this.flight) return
     this.setHover(null)
     if (this.opts.reducedMotion) {
+      // No camera travel: jump straight to the end pose.
+      const end = flight.end ?? 'exit'
+      this.held = end === 'hold' ? { position: flight.curve.getPoint(1), lookAt: flight.lookAt.clone() } : null
       flight.onProgress?.(1)
-      window.setTimeout(flight.onDone, 200)
+      window.setTimeout(flight.onDone, end === 'exit' ? 200 : 0)
       return
     }
+    this.held = null
     const curve = flight.curve as THREE.CubicBezierCurve3
     if ('v0' in curve) curve.v0.copy(this.camera.position)
     this.flight = {
@@ -235,8 +264,22 @@ export class Stage {
       f.onProgress?.(raw)
       if (raw >= 1) {
         this.flight = null
-        cancelAnimationFrame(this.frame)
+        const end = f.end ?? 'exit'
+        if (end === 'exit') cancelAnimationFrame(this.frame)
+        if (end === 'hold') this.held = { position: this.camera.position.clone(), lookAt: this.lookAt.clone() }
+        if (end === 'resume') this.parallax.set(0, 0)
         f.onDone()
+      }
+      return
+    }
+
+    if (this.held) {
+      this.camera.position.copy(this.held.position)
+      this.lookAt.copy(this.held.lookAt)
+      this.camera.lookAt(this.lookAt)
+      if (this.pointerDirty && this.pointerInside) {
+        this.pointerDirty = false
+        this.setHover(this.pick())
       }
       return
     }
@@ -310,7 +353,6 @@ export class Stage {
   private onClick = (e: MouseEvent): void => {
     if (this.flight) return
     this.updatePointer(e)
-    const id = this.pick()
-    if (id) this.onPick(id)
+    this.onPick(this.pick() ?? '')
   }
 }

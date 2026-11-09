@@ -103,7 +103,9 @@ export function createExterior(opts: ExteriorOptions): SceneHandle {
   let hovering = false
   let hoverAmount = 0
   stage.onHover = (id) => (hovering = id === 'museum')
-  stage.onPick = () => enter()
+  stage.onPick = (id) => {
+    if (id === 'museum') enter()
+  }
 
   const timeScale = opts.reducedMotion ? 0.25 : 1
   stage.addTicker((time, dt) => {

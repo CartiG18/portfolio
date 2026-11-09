@@ -7,7 +7,7 @@ import { exhibits, findExhibit } from './data/exhibits.ts'
 import { site } from './data/site.ts'
 import { renderGrounds, mountGrounds, type SceneController } from './components/grounds.ts'
 import { renderLobby, mountLobby } from './components/lobby.ts'
-import { renderExhibit, renderNotFound } from './components/exhibit.ts'
+import { mountExhibit, renderExhibit, renderNotFound } from './components/exhibit.ts'
 import { esc } from './components/html.ts'
 
 const REDUCED_MOTION = window.matchMedia('(prefers-reduced-motion: reduce)')
@@ -71,9 +71,13 @@ function render(route: Route): void {
     const exhibit = findExhibit(route.id)
     main.innerHTML = exhibit ? renderExhibit(exhibit) : renderNotFound()
     document.title = `${exhibit ? exhibit.title : 'Not found'} · ${site.museumName}`
+    if (exhibit) {
+      const root = main.querySelector<HTMLElement>('[data-scene]')!
+      void mountExhibit(root, exhibit.id, { reducedMotion: REDUCED_MOTION.matches }).then(adopt)
+    }
   }
 
-  document.body.dataset.view = route.view
+  document.body.dataset.view = route.view === 'exhibit' && findExhibit(route.id) ? 'room' : route.view
   main.classList.remove('is-arriving')
   void main.offsetWidth // restart the arrival animation
   main.classList.add('is-arriving')

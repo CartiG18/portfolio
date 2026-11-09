@@ -131,3 +131,18 @@ export function contactShadowTexture(): THREE.CanvasTexture {
   g.fillRect(0, 0, s, s)
   return new THREE.CanvasTexture(c)
 }
+
+/** A soft white oval, used as a mask for additive glows (tinted by the material colour). */
+export function softGlowTexture(): THREE.CanvasTexture {
+  const s = 128
+  const c = document.createElement('canvas')
+  c.width = c.height = s
+  const g = c.getContext('2d')!
+  const grad = g.createRadialGradient(s / 2, s / 2, s * 0.15, s / 2, s / 2, s / 2)
+  grad.addColorStop(0, 'rgba(255,255,255,1)')
+  grad.addColorStop(0.55, 'rgba(255,255,255,0.5)')
+  grad.addColorStop(1, 'rgba(255,255,255,0)')
+  g.fillStyle = grad
+  g.fillRect(0, 0, s, s)
+  return new THREE.CanvasTexture(c)
+}

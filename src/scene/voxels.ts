@@ -54,7 +54,7 @@ export function mulberry32(seed: number): () => number {
  * axis. Every block face is axis-aligned, so this gives exact, unstretched pixels on props
  * of any size, and lets us add a floor-contact darkening term in the same pass.
  */
-function texturedMaterial(style: BlockStyle): THREE.MeshStandardMaterial {
+export function texturedMaterial(style: BlockStyle): THREE.MeshStandardMaterial {
   const material = new THREE.MeshStandardMaterial({
     color: 0xffffff,
     map: style.texture ? getTexture(style.texture) : null,

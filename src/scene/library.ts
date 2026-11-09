@@ -4,8 +4,8 @@ import type { ExhibitId } from '../data/exhibits.ts'
 
 /** Victorian library interior: dark woods, maroon, brass, candlelight. */
 export const LIBRARY_STYLES: Record<string, BlockStyle> = {
-  floorA: { color: 0x4a2d1a, jitter: 0.1, castShadow: false, texture: 'planks', roughness: 0.7, floorAO: true },
-  floorB: { color: 0x3e2515, jitter: 0.1, castShadow: false, texture: 'planks', roughness: 0.7, floorAO: true },
+  floorA: { color: 0x4a2d1a, jitter: 0.1, castShadow: false, texture: 'planks', roughness: 0.7 },
+  floorB: { color: 0x3e2515, jitter: 0.1, castShadow: false, texture: 'planks', roughness: 0.7 },
   wainscot: { color: 0x34200f, jitter: 0.06, texture: 'grain', roughness: 0.6, floorAO: true },
   trimWood: { color: 0x553319, jitter: 0.06, texture: 'grain', roughness: 0.55 },
   maroon: { color: 0x4a1418, jitter: 0.04, texture: 'damask', texScale: 0.5, roughness: 0.9, floorAO: true },
@@ -33,12 +33,12 @@ export const LIBRARY_STYLES: Record<string, BlockStyle> = {
 }
 
 // Warm leathers only: oxblood, burgundy, umber, brown, tan, black.
-const BOOKS = ['bookRed', 'bookBurgundy', 'bookUmber', 'bookBrown', 'bookTan', 'bookBlack', 'bookRed', 'bookBrown']
+export const BOOKS = ['bookRed', 'bookBurgundy', 'bookUmber', 'bookBrown', 'bookTan', 'bookBlack', 'bookRed', 'bookBrown']
 
 /** Room extents (inner floor is x -13..13, z -18..0; walls at x ±14 and z -19). */
 const ROOM = { halfW: 14, back: -19, front: 1, height: 12, shelfTop: 9 }
 
-type Wall = 'back' | 'left' | 'right'
+export type Wall = 'back' | 'left' | 'right'
 
 export interface DoorSpot {
   id: ExhibitId
@@ -360,7 +360,7 @@ export function buildLibrary(b: VoxelBuilder, rand: () => number): LibraryInfo {
 }
 
 /** One shelf row: books of varied height and thickness, a few leaning, some with gold-foil bands. */
-function shelfRow(
+export function shelfRow(
   b: VoxelBuilder,
   rand: () => number,
   wall: Wall,
