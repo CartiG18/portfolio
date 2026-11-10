@@ -35,7 +35,7 @@ export function createExterior(opts: ExteriorOptions): SceneHandle {
     background: NIGHT,
     fog: { near: 95, far: 160 },
     exposure: 1.15,
-    bloom: { strength: 0.7, radius: 0.5, threshold: 0.7 },
+    bloom: { strength: 0.7, radius: 0.5, threshold: 0.7, scale: 0.5 },
     // Neutral at night (the original look); golden hour adds amber and sunbeams.
     grade: { vignette: 0, grain: 0, warmth: 0, rays: 0 },
     camera: {
@@ -50,11 +50,13 @@ export function createExterior(opts: ExteriorOptions): SceneHandle {
   })
   const { scene } = stage
 
-  const groundGroup = ground.build()
+  // Typical sky-camera position, for nearest-first instance ordering.
+  const VIEW_FROM = new THREE.Vector3(0, 75, 68)
+  const groundGroup = ground.build(VIEW_FROM)
   scene.add(groundGroup)
-  const museumGroup = museumBuilder.build()
+  const museumGroup = museumBuilder.build(VIEW_FROM)
   scene.add(museumGroup)
-  stage.addPickable({ id: 'museum', object: museumGroup })
+  stage.addPickable({ id: 'museum', object: museumGroup, pad: false })
 
   const fireflies = createMotes(
     {
@@ -167,6 +169,7 @@ export function createExterior(opts: ExteriorOptions): SceneHandle {
     moon.color.lerpColors(L.night.sun, L.day.sun, b)
     moon.intensity = lerp(1.7, 3.2, b)
     moon.position.lerpVectors(MOON_POS, SUN_POS, b)
+    stage.refreshShadows() // only while the sun/moon is actually moving
     for (const g of glowing) g.m.emissiveIntensity = lerp(g.night, g.day, b)
     for (const w of windows) {
       w.emissive.lerpColors(windowNight, windowDay, b)

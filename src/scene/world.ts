@@ -7,18 +7,19 @@ const BOUNDS = { x: 70, zMin: -72, zMax: 34 }
 export const GROUND_STYLES: Record<string, BlockStyle> = {
   grass: { color: 0x2f7030, jitter: 0.18, castShadow: false },
   grassDark: { color: 0x245a26, jitter: 0.15, castShadow: false },
-  dirt: { color: 0x4a3324, jitter: 0.15, castShadow: false },
+  // Trees and ground clutter don't receive shadows (cheaper shading; they're mostly in shade).
+  dirt: { color: 0x4a3324, jitter: 0.15, castShadow: false, receiveShadow: false },
   path: { color: 0x7d7a72, jitter: 0.18, castShadow: false },
-  rock: { color: 0x5d6168, jitter: 0.2 },
-  trunk: { color: 0x4a3020, jitter: 0.15 },
-  pine: { color: 0x2c6a48, jitter: 0.25 },
-  pineDark: { color: 0x215538, jitter: 0.2 },
-  tuft: { color: 0x4a9440, jitter: 0.3, castShadow: false },
-  flower: { color: 0xb9c6ff, emissive: 0x6d7dff, emissiveIntensity: 1.6, castShadow: false },
-  mushroom: { color: 0x7fe3ff, emissive: 0x29b6e8, emissiveIntensity: 2.2, castShadow: false },
+  rock: { color: 0x5d6168, jitter: 0.2, receiveShadow: false },
+  trunk: { color: 0x4a3020, jitter: 0.15, receiveShadow: false },
+  pine: { color: 0x2c6a48, jitter: 0.25, receiveShadow: false },
+  pineDark: { color: 0x215538, jitter: 0.2, receiveShadow: false },
+  tuft: { color: 0x4a9440, jitter: 0.3, castShadow: false, receiveShadow: false },
+  flower: { color: 0xb9c6ff, emissive: 0x6d7dff, emissiveIntensity: 1.6, castShadow: false, receiveShadow: false },
+  mushroom: { color: 0x7fe3ff, emissive: 0x29b6e8, emissiveIntensity: 2.2, castShadow: false, receiveShadow: false },
   iron: { color: 0x1e1f24, jitter: 0.1 },
   lantern: { color: 0xffd38a, emissive: 0xffa53d, emissiveIntensity: 2.6, castShadow: false },
-  hedge: { color: 0x1f4f2a, jitter: 0.2 },
+  hedge: { color: 0x1f4f2a, jitter: 0.2, receiveShadow: false },
   basin: { color: 0xbdb3a0, jitter: 0.1 },
   water: { color: 0x3a6a8a, emissive: 0x1b4a7a, emissiveIntensity: 0.9, castShadow: false },
 }
@@ -105,6 +106,8 @@ export function buildGrounds(b: VoxelBuilder, rand: () => number): Pick<MuseumIn
       const d = clearingDistance(x, z)
       if (d < CLEARING + 1 || isPath(x, z) || isMuseumPlot(x, z)) continue
       if (rand() > (d < CLEARING + 4 ? 0.05 : 0.085)) continue
+      // Skip trees that would sit entirely in the fog (beyond ~155 units from the sky camera).
+      if (Math.hypot(x, 75 - 6, z - 68) > 155) continue
       if (trunks.some(([tx, tz]) => Math.abs(tx - x) < 3 && Math.abs(tz - z) < 3)) continue
       trunks.push([x, z])
       const h = heights.get(`${x},${z}`)!

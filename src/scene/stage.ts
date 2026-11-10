@@ -16,7 +16,7 @@ export interface StageOptions {
   background: number
   fog: { near: number; far: number }
   exposure: number
-  bloom: { strength: number; radius: number; threshold: number }
+  bloom: { strength: number; radius: number; threshold: number; /** Fraction of render size (default 1). */ scale?: number }
   /** Vignette, grain and warm grade (display space). */
   grade?: GradeOptions
   /** Allow depth of field, used while an exhibit item is in focus. */
@@ -49,6 +49,50 @@ export interface StageOptions {
 export interface Pickable {
   id: string
   object: THREE.Object3D
+  /**
+   * Padding (world units) for the invisible pick proxy around the object's bounds, so targets
+   * are easy to land on. `false` picks the exact mesh instead (e.g. the whole palace outside).
+   * Several pickables may share an id (a door and its placard act as one target).
+   */
+  pad?: number | false
+}
+
+/**
+ * Aim assist for eye-level views: a clickable target "locks" the view so it doesn't slide out
+ * from under the cursor, with hysteresis on release and friction as the cursor approaches.
+ * All tuning in one place.
+ */
+/** Frame-rate watchdog tuning (see Stage.watchFrameRate). */
+export const WATCHDOG = {
+  MIN_FPS: 50,
+  WINDOW_S: 3,
+  STEP: 0.15,
+  FLOOR: 0.7,
+} as const
+
+export const AIM = {
+  /** Ease into the head-turn freeze when a target is hovered. */
+  LOCK_EASE_S: 0.15,
+  /** Ease the head-turn back in after leaving a target. */
+  RELEASE_EASE_S: 0.3,
+  /** A locked target stays hovered until the cursor leaves its bounds grown by this fraction… */
+  HYSTERESIS_FRAC: 0.25,
+  /** …or by at least this many pixels. */
+  HYSTERESIS_MIN_PX: 24,
+  /** Within this many pixels of a target's bounds, head-turn gain starts to drop… */
+  FRICTION_RADIUS_PX: 60,
+  /** …down to this fraction at the bounds. */
+  FRICTION_MIN_GAIN: 0.35,
+  /** Default proxy padding (world units). */
+  DEFAULT_PAD: 0.15,
+} as const
+
+interface PickProxy {
+  id: string
+  /** What the raycaster tests: an invisible padded box, or the object itself. */
+  target: THREE.Object3D
+  /** World-space bounds (padded), for screen-space hysteresis and friction. */
+  box: THREE.Box3
 }
 
 export interface Flight {
@@ -95,7 +139,13 @@ export class Stage {
   private parallaxTarget = new THREE.Vector2()
   private parallax = new THREE.Vector2()
   private raycaster = new THREE.Raycaster()
-  private pickables: Pickable[] = []
+  private proxies: PickProxy[] = []
+  /** Target under the pointer (or locked); clicks activate this, never a fresh raycast. */
+  private pointerHovered: string | null = null
+  private locked: string | null = null
+  /** Head-turn gain: 1 = free, 0 = frozen on a target. */
+  private aimGain = 1
+  private pointerPx = new THREE.Vector2()
   private hovered: string | null = null
   private pointerInside = false
   private pointerDirty = false
@@ -115,6 +165,10 @@ export class Stage {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5))
     this.renderer.shadowMap.enabled = true
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap
+    this.renderer.shadowMap.autoUpdate = false
+    this.renderer.shadowMap.needsUpdate = true
+    // Shadow casters in these scenes are static, so shadow maps render only on request
+    // (see refreshShadows) instead of every frame; this was the exterior's biggest cost.
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping
     this.renderer.toneMappingExposure = opts.exposure
 
@@ -131,6 +185,12 @@ export class Stage {
     }
     const { strength, radius, threshold } = opts.bloom
     this.bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), strength, radius, threshold)
+    // Optionally run bloom at reduced resolution (it's blurred anyway).
+    const bloomScale = opts.bloom.scale ?? 1
+    if (bloomScale !== 1) {
+      const setSize = this.bloom.setSize.bind(this.bloom)
+      this.bloom.setSize = (w: number, h: number) => setSize(Math.max(1, Math.round(w * bloomScale)), Math.max(1, Math.round(h * bloomScale)))
+    }
     this.composer.addPass(this.bloom)
     this.composer.addPass(new OutputPass())
     if (opts.grade) {
@@ -152,7 +212,19 @@ export class Stage {
   }
 
   addPickable(p: Pickable): void {
-    this.pickables.push(p)
+    p.object.updateWorldMatrix(true, true)
+    const box = new THREE.Box3().setFromObject(p.object)
+    if (p.pad === false) {
+      this.proxies.push({ id: p.id, target: p.object, box })
+      return
+    }
+    box.expandByScalar(p.pad ?? AIM.DEFAULT_PAD)
+    const size = box.getSize(new THREE.Vector3())
+    const proxy = new THREE.Mesh(new THREE.BoxGeometry(size.x, size.y, size.z), new THREE.MeshBasicMaterial({ visible: false }))
+    box.getCenter(proxy.position)
+    proxy.updateMatrixWorld()
+    this.scene.add(proxy)
+    this.proxies.push({ id: p.id, target: proxy, box })
   }
 
   addTicker(fn: (time: number, dt: number) => void): void {
@@ -175,6 +247,39 @@ export class Stage {
   /** Current look target, e.g. to start a flight from where the camera is pointing. */
   get currentLookAt(): THREE.Vector3 {
     return this.lookAt.clone()
+  }
+
+  // ---------- Frame-rate watchdog ----------
+  // If a scene averages under WATCHDOG.MIN_FPS for WATCHDOG.WINDOW_S, step the render
+  // resolution down (never below WATCHDOG.FLOOR) so slower GPUs settle at a steady rate.
+  private watchTime = 0
+  private watchFrames = 0
+  private watchSkip = 2 // ignore the first windows (shader compile, warm-up)
+
+  private watchFrameRate(dt: number): void {
+    if (dt > 0.5) return // tab was hidden
+    this.watchTime += dt
+    this.watchFrames++
+    if (this.watchTime < WATCHDOG.WINDOW_S) return
+    const fps = this.watchFrames / this.watchTime
+    this.watchTime = 0
+    this.watchFrames = 0
+    if (this.watchSkip > 0) {
+      this.watchSkip--
+      return
+    }
+    const current = this.renderer.getPixelRatio()
+    if (fps < WATCHDOG.MIN_FPS && current > WATCHDOG.FLOOR + 0.01) {
+      const next = Math.max(WATCHDOG.FLOOR, current - WATCHDOG.STEP)
+      this.renderer.setPixelRatio(next)
+      this.composer.setPixelRatio(next)
+      this.resize()
+    }
+  }
+
+  /** Re-render shadow maps on the next frame (call when a shadow-casting light moves). */
+  refreshShadows(): void {
+    this.renderer.shadowMap.needsUpdate = true
   }
 
   /** Adjust the global look (used for the day/night crossfade). */
@@ -218,7 +323,8 @@ export class Stage {
   /** Fly the camera along a curve (its first point is replaced by the current position). */
   fly(flight: Flight): void {
     if (this.flight) return
-    this.setHover(null)
+    this.locked = null
+    this.setPointerHover(null)
     if (this.opts.reducedMotion) {
       // No camera travel: jump straight to the end pose.
       const end = flight.end ?? 'exit'
@@ -245,7 +351,9 @@ export class Stage {
   start(): void {
     const tick = () => {
       this.frame = requestAnimationFrame(tick)
-      const dt = Math.min(this.clock.getDelta(), 0.05)
+      const raw = this.clock.getDelta()
+      this.watchFrameRate(raw)
+      const dt = Math.min(raw, 0.05)
       const time = this.clock.getElapsedTime()
       for (const t of this.tickers) t(time, dt)
       this.updateCamera(time, dt)
@@ -357,13 +465,16 @@ export class Stage {
       this.camera.lookAt(this.lookAt)
       if (this.pointerDirty && this.pointerInside) {
         this.pointerDirty = false
-        this.setHover(this.pick())
+        this.setPointerHover(this.pick())
       }
       return
     }
 
     const before = this.parallax.clone()
-    this.parallax.lerp(this.parallaxTarget, 1 - Math.exp(-dt * 2.5))
+    const aiming = !!this.opts.lookAround && this.finePointer && !this.opts.reducedMotion && this.pointerInside
+    if (aiming) this.updateAim(dt)
+    else this.aimGain += (1 - this.aimGain) * Math.min(1, dt * 4)
+    this.parallax.lerp(this.parallaxTarget, (1 - Math.exp(-dt * 2.5)) * this.aimGain)
     // The view is still easing, so what's under the cursor can change without the mouse moving.
     if (before.distanceToSquared(this.parallax) > 1e-7) this.pointerDirty = true
     const target = this.opts.camera.target
@@ -387,9 +498,9 @@ export class Stage {
     }
     this.camera.lookAt(this.lookAt)
 
-    if (this.pointerDirty && this.pointerInside) {
+    if (!aiming && this.pointerDirty && this.pointerInside) {
       this.pointerDirty = false
-      this.setHover(this.pick())
+      this.setPointerHover(this.pick())
     }
   }
 
@@ -415,11 +526,79 @@ export class Stage {
   private pick(): string | null {
     this.raycaster.setFromCamera(this.pointer, this.camera)
     let best: { id: string; distance: number } | null = null
-    for (const p of this.pickables) {
-      const hit = this.raycaster.intersectObject(p.object, true)[0]
+    for (const p of this.proxies) {
+      const hit = this.raycaster.intersectObject(p.target, true)[0]
       if (hit && (!best || hit.distance < best.distance)) best = { id: p.id, distance: hit.distance }
     }
     return best?.id ?? null
+  }
+
+  private corner = new THREE.Vector3()
+  private canvasRect = new DOMRect()
+
+  /** Screen-space bounds (px) of every proxy with this id, unioned; null if behind the camera. */
+  private screenRect(id: string): { x0: number; y0: number; x1: number; y1: number } | null {
+    const rect = this.canvasRect
+    let x0 = Infinity
+    let y0 = Infinity
+    let x1 = -Infinity
+    let y1 = -Infinity
+    for (const p of this.proxies) {
+      if (p.id !== id) continue
+      const { min, max } = p.box
+      for (let i = 0; i < 8; i++) {
+        this.corner.set(i & 1 ? max.x : min.x, i & 2 ? max.y : min.y, i & 4 ? max.z : min.z).project(this.camera)
+        if (this.corner.z > 1) return null
+        const sx = ((this.corner.x + 1) / 2) * rect.width
+        const sy = ((1 - this.corner.y) / 2) * rect.height
+        x0 = Math.min(x0, sx)
+        y0 = Math.min(y0, sy)
+        x1 = Math.max(x1, sx)
+        y1 = Math.max(y1, sy)
+      }
+    }
+    return Number.isFinite(x0) ? { x0, y0, x1, y1 } : null
+  }
+
+  /** Lock, hysteresis and friction for eye-level views (runs only while the pointer is in). */
+  private updateAim(dt: number): void {
+    // One layout read per frame, shared by every target's screen-space bounds.
+    this.canvasRect = this.opts.canvas.getBoundingClientRect()
+    const p = this.pointerPx
+    // Release a locked target only once the cursor leaves its expanded bounds.
+    if (this.locked) {
+      const r = this.screenRect(this.locked)
+      const mx = r ? Math.max(AIM.HYSTERESIS_MIN_PX, (r.x1 - r.x0) * AIM.HYSTERESIS_FRAC) : 0
+      const my = r ? Math.max(AIM.HYSTERESIS_MIN_PX, (r.y1 - r.y0) * AIM.HYSTERESIS_FRAC) : 0
+      if (!r || p.x < r.x0 - mx || p.x > r.x1 + mx || p.y < r.y0 - my || p.y > r.y1 + my) this.locked = null
+    }
+    if (!this.locked && this.pointerDirty) {
+      this.pointerDirty = false
+      this.locked = this.pick()
+    }
+    this.setPointerHover(this.locked)
+
+    // Friction: slow the head turn as the cursor nears any target.
+    let nearest = Infinity
+    const seen = new Set<string>()
+    for (const proxy of this.proxies) {
+      if (seen.has(proxy.id)) continue
+      seen.add(proxy.id)
+      const r = this.screenRect(proxy.id)
+      if (!r) continue
+      const dx = Math.max(r.x0 - p.x, 0, p.x - r.x1)
+      const dy = Math.max(r.y0 - p.y, 0, p.y - r.y1)
+      nearest = Math.min(nearest, Math.hypot(dx, dy))
+    }
+    const friction = THREE.MathUtils.lerp(AIM.FRICTION_MIN_GAIN, 1, THREE.MathUtils.smoothstep(nearest, 0, AIM.FRICTION_RADIUS_PX))
+    const want = this.locked ? 0 : friction
+    const tau = want < this.aimGain ? AIM.LOCK_EASE_S : AIM.RELEASE_EASE_S
+    this.aimGain += (want - this.aimGain) * (1 - Math.exp((-dt * 3) / tau))
+  }
+
+  private setPointerHover(id: string | null): void {
+    this.pointerHovered = id
+    this.setHover(id)
   }
 
   private setHover(id: string | null): void {
@@ -432,6 +611,7 @@ export class Stage {
   private updatePointer(e: MouseEvent): void {
     const rect = this.opts.canvas.getBoundingClientRect()
     this.pointer.set(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1)
+    this.pointerPx.set(e.clientX - rect.left, e.clientY - rect.top)
   }
 
   private onPointerMove = (e: PointerEvent): void => {
@@ -453,12 +633,16 @@ export class Stage {
   private onPointerLeave = (): void => {
     this.pointerInside = false
     this.parallaxTarget.set(0, 0)
-    this.setHover(null)
+    this.locked = null
+    this.setPointerHover(null)
   }
 
   private onClick = (e: MouseEvent): void => {
     if (this.flight) return
     this.updatePointer(e)
-    this.onPick(this.pick() ?? '')
+    // With a fine pointer, activate what's hovered/locked (no fresh raycast after drift).
+    // Touch has no hover, so a tap picks directly.
+    const id = this.finePointer ? this.pointerHovered : this.pick()
+    this.onPick(id ?? '')
   }
 }

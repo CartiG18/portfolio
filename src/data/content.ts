@@ -117,8 +117,8 @@ export const projectCases: ProjectCase[] = [
 
 /** TODO(content): draft — needs owner approval. Written from résumé facts only. */
 export const aboutParagraphs: string[] = [
-  'I study computer science, with a minor in mathematics, at Loyola Marymount University, where I am also a lab teaching assistant.',
-  'I spent summer 2025 as a data engineering intern at Kollective Technology, and I do research at the University of Washington on how LLM agents interpret and act on interactive dashboards.',
+  'I study computer science with a minor in mathematics at Loyola Marymount University, where I am also a lab teaching assistant.',
+  'I spent summer 2025 as a data engineering intern at Kollective Technology, and I am continuing research from my time in the REU program at the University of Washington on simulating user interactions on interactive dashboards.',
   'Outside of class I’m involved in ACM and the Creare Service Organization, and I spend my free time rock climbing, surfing, and golfing.',
 ]
 

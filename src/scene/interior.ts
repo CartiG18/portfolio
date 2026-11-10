@@ -10,6 +10,7 @@ import { contactLabel, openEmail, socialLinks } from '../data/site.ts'
 import { bookNotes } from '../data/content.ts'
 import { sound } from '../audio.ts'
 import { createClerestories, createClock, createSunlight } from './lobbyExtras.ts'
+import { createDoors } from './doors.ts'
 import { createDayBlend, toggleTimeOfDay } from './timeOfDay.ts'
 import { EMAIL_ICON_PATH, SOCIAL_ICON_PATHS } from '../data/icons.ts'
 
@@ -60,12 +61,12 @@ export async function createInterior(opts: InteriorOptions): Promise<InteriorHan
       refAspect: 1.83,
       // Pitched up ~7° so the doors and placards sit near the vertical centre, not above a
       // half-frame of empty runner.
-      target: new THREE.Vector3(0, 7.0, -19),
+      target: new THREE.Vector3(0, 8.0, -19),
     },
     lookAround: { yawDeg: 38, pitchDeg: 12 },
   })
   const { scene } = stage
-  const libraryGroup = builder.build()
+  const libraryGroup = builder.build(new THREE.Vector3(0, 3.3, 10.5)) // entrance eye position
   scene.add(libraryGroup)
   // Wood, shelving and walls lift by day (emissive materials like flames are left alone).
   const liftMats = libraryGroup.children
@@ -96,7 +97,6 @@ export async function createInterior(opts: InteriorOptions): Promise<InteriorHan
   scene.add(shadows)
 
   // ---------- Doors: glowing openings, brass placards, hit boxes ----------
-  const doorGlows = new Map<string, THREE.MeshBasicMaterial>()
   const glowTexture = doorGlowTexture()
   const plates = new Map<string, THREE.MeshBasicMaterial>()
   const halos = new Map<string, THREE.MeshBasicMaterial>()
@@ -126,38 +126,23 @@ export async function createInterior(opts: InteriorOptions): Promise<InteriorHan
     const exhibit = findExhibit(door.id)!
     const facing = Math.atan2(door.normal.x, door.normal.z)
 
-    // Hover is an interactive state, so the light from beyond takes the cool accent.
-    // A paler, whiter cyan than ACCENT: over the warm passage light, full ACCENT reads green-teal.
-    const glowMat = new THREE.MeshBasicMaterial({
-      color: 0xd6f2f6,
-      map: glowTexture,
-      transparent: true,
-      opacity: 0,
-      depthWrite: false,
-      blending: THREE.AdditiveBlending,
-      visible: false,
-    })
-    const glow = new THREE.Mesh(new THREE.PlaneGeometry(door.width, door.height), glowMat)
-    glow.position.copy(door.center).addScaledVector(door.normal, -0.9)
-    glow.rotation.y = facing
-    scene.add(glow)
-    doorGlows.set(door.id, glowMat)
-
     // Sized to stay legible from the stepped-back entrance.
     // Side-wall plaques are a little smaller, leaving a clear gap between Résumé and CV.
-    const plateWidth = (door.width + 1.8) * (door.wall === 'back' ? 1.35 : 1.25)
+    // Projects' plaque is a touch smaller so it clears the ceiling above its taller doorway.
+    const plateWidth = (door.width + 1.8) * (door.grand ? 1.15 : door.wall === 'back' ? 1.35 : 1.25)
     const plate = new THREE.Mesh(
       new THREE.PlaneGeometry(plateWidth, plateWidth * 0.29),
       new THREE.MeshBasicMaterial({ map: placardTexture(`Exhibit ${exhibit.number}`, exhibit.title) }),
     )
     plate.position
       .copy(door.center)
-      .setY(0.5 + door.height + 2.4)
+      // Just above the doorway's lintel row.
+      .setY(door.height + 1.5 + 0.22 + (plateWidth * 0.29) / 2)
       .addScaledVector(door.normal, 1.02)
     plate.rotation.y = facing
     scene.add(plate)
     plates.set(door.id, plate.material as THREE.MeshBasicMaterial)
-    stage.addPickable({ id: door.id, object: plate })
+    stage.addPickable({ id: door.id, object: plate, pad: 0.25 }) // door + placard act as one target
 
     // Accent halo behind the plaque, shown on hover.
     const halo = new THREE.Mesh(new THREE.PlaneGeometry(plateWidth + 0.5, plateWidth * 0.29 + 0.4), haloMaterial.clone())
@@ -188,27 +173,11 @@ export async function createInterior(opts: InteriorOptions): Promise<InteriorHan
     hit.position.copy(door.center).setY(0.5 + (door.height + 2.5) / 2).addScaledVector(door.normal, 0.8)
     hit.rotation.y = facing
     scene.add(hit)
-    stage.addPickable({ id: door.id, object: hit })
+    stage.addPickable({ id: door.id, object: hit, pad: 0.1 })
   }
 
-  // ---------- Passages: warm light at the far end of each doorway ----------
-  const farGlow = new THREE.MeshBasicMaterial({
-    map: glowTexture,
-    color: 0xffb070,
-    transparent: true,
-    opacity: 0.55,
-    depthWrite: false,
-    blending: THREE.AdditiveBlending,
-  })
-  const farGlows = new Map<string, THREE.MeshBasicMaterial>()
-  for (const pass of lib.passages) {
-    const mat = farGlow.clone()
-    farGlows.set(pass.id, mat)
-    const plane = new THREE.Mesh(new THREE.PlaneGeometry(pass.width + 2, pass.height + 0.6), mat)
-    plane.position.copy(pass.far).setY(0.5 + (pass.height + 0.6) / 2)
-    plane.rotation.y = Math.atan2(pass.normal.x, pass.normal.z)
-    scene.add(plane)
-  }
+  // ---------- Grand doors in every exhibit doorway ----------
+  const doors = createDoors(scene, lib.doors)
 
   // ---------- Haze: light shafts catching the chandelier light ----------
   const hazeMaterial = new THREE.ShaderMaterial({
@@ -258,7 +227,7 @@ export async function createInterior(opts: InteriorOptions): Promise<InteriorHan
     canvas.position.copy(p.center).addScaledVector(p.normal, 0.13)
     canvas.rotation.y = Math.atan2(p.normal.x, p.normal.z)
     scene.add(canvas)
-    if (isEmail || link?.href) stage.addPickable({ id: `link:${p.id}`, object: canvas })
+    if (isEmail || link?.href) stage.addPickable({ id: `link:${p.id}`, object: canvas, pad: 0.25 })
   }
   void contactLabel
 
@@ -284,7 +253,7 @@ export async function createInterior(opts: InteriorOptions): Promise<InteriorHan
   }
   // No point-light shadows: each costs six extra scene renders; contact shadows ground the furniture.
   // Lights hang well below each chandelier so its brass isn't blown out to white.
-  lib.chandeliers.forEach((c) => addCandleLight(c.clone().setY(c.y - 2.2), 42, 26))
+  lib.chandeliers.forEach((c) => addCandleLight(c.clone().setY(c.y - 2.2), 62, 30)) // higher ceiling: a little stronger to reach the floor
   for (const x of [-6.5, 6.5]) addCandleLight(new THREE.Vector3(x, 3.2, -9), 16, 9)
   addCandleLight(new THREE.Vector3(0, 6, -15), 20, 14)
   for (const x of [-10, 10]) addCandleLight(new THREE.Vector3(x, 6, -14), 18, 13)
@@ -308,7 +277,7 @@ export async function createInterior(opts: InteriorOptions): Promise<InteriorHan
   const clerestories = createClerestories(scene, brassMat)
   const sunlight = createSunlight(scene, rand)
   const clock = createClock(scene)
-  stage.addPickable({ id: 'clock', object: clock.hit })
+  stage.addPickable({ id: 'clock', object: clock.hit, pad: 0.25 })
   const dayBlend = createDayBlend(opts.reducedMotion)
   const hemiNight = { sky: new THREE.Color(0x9a7a58), ground: new THREE.Color(0x6a4428) }
   const hemiDay = { sky: new THREE.Color(0xd9b98c), ground: new THREE.Color(0x8a6038) }
@@ -354,7 +323,7 @@ export async function createInterior(opts: InteriorOptions): Promise<InteriorHan
       group.add(band)
     }
     scene.add(group)
-    stage.addPickable({ id: `book:${i}`, object: group })
+    stage.addPickable({ id: `book:${i}`, object: group, pad: 0.22 })
     void along
     return { group, home, normal: n, foil, hover: 0, pull: 0 }
   })
@@ -428,14 +397,7 @@ export async function createInterior(opts: InteriorOptions): Promise<InteriorHan
     const ft = time * timeScale
     for (const m of flameMats) m.emissiveIntensity = 2.0 * candle * (0.85 + Math.sin(ft * 13) * 0.08 + Math.sin(ft * 29) * 0.05)
     const k = Math.min(1, dt * 8)
-    for (const [id, mat] of doorGlows) {
-      const on = id === hovered || hovered === `plate:${id}`
-      mat.opacity += ((on ? 0.4 : 0) - mat.opacity) * k
-      mat.visible = mat.opacity > 0.01
-      // Dim the warm passage light behind a hovered door so the cool accent reads cleanly.
-      const far = farGlows.get(id)
-      if (far) far.opacity += ((on ? 0 : 0.55) - far.opacity) * k
-    }
+    doors.update(hovered, day, dt)
     // Plaques pick up a soft accent glow and tint when their door is hovered.
     for (const [id, mat] of halos) {
       const on = id === hovered ? 1 : 0
@@ -461,18 +423,26 @@ export async function createInterior(opts: InteriorOptions): Promise<InteriorHan
     // Walk at eye level: turn toward the door, approach it head-on, then step through.
     const eye = 3.3
     const approach = door.center.clone().addScaledVector(door.normal, 5).setY(eye)
-    const end = door.center.clone().addScaledVector(door.normal, 0.6).setY(Math.min(eye, door.center.y + 0.5))
+    // Stop just short of the threshold, looking level into the warm light (not up at the transom).
+    const end = door.center.clone().addScaledVector(door.normal, 1.7).setY(eye)
     // Head down the centre aisle first so the walk doesn't cut across the reading tables.
     const firstStep = new THREE.Vector3(0, eye, Math.min(-2, approach.z * 0.75))
-    sound.steps(1.5)
-    stage.fly({
-      curve: new THREE.CubicBezierCurve3(new THREE.Vector3(), firstStep, approach, end),
-      lookAt: door.center,
-      duration: 1.5,
-      bob: 0.05,
-      onProgress: opts.onDoorProgress,
-      onDone: () => opts.onEnterExhibit(id),
-    })
+    // The doors start swinging at the click; the walk begins partway through the swing.
+    doors.open(id, opts.reducedMotion)
+    sound.doorOpen()
+    const walk = () => {
+      sound.steps(1.5)
+      stage.fly({
+        curve: new THREE.CubicBezierCurve3(new THREE.Vector3(), firstStep, approach, end),
+        lookAt: door.center.clone().addScaledVector(door.normal, -3).setY(eye - 0.2),
+        duration: 1.5,
+        bob: 0.05,
+        onProgress: opts.onDoorProgress,
+        onDone: () => opts.onEnterExhibit(id),
+      })
+    }
+    if (opts.reducedMotion) walk()
+    else window.setTimeout(walk, 350)
   }
 
   stage.start()

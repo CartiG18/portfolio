@@ -219,3 +219,9 @@ body[data-view='room'] {
     transform: translate(-50%, 6px);
   }
 }
+
+/* Indoors, routes fade through a warm dark amber rather than black. */
+.lobby .scene-view__fade,
+.exhibit-room .scene-view__fade {
+  background: #1c0f06;
+}

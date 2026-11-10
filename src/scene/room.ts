@@ -154,7 +154,7 @@ export async function createExhibitRoom(opts: RoomOptions): Promise<RoomHandle> 
   )
   scene.add(motes)
 
-  for (const it of piece.items) stage.addPickable({ id: it.id, object: it.hit })
+  for (const it of piece.items) stage.addPickable({ id: it.id, object: it.hit, pad: 0.15 })
 
   let openId: string | null = null
   /** A close requested while the camera was still moving in; run it on arrival. */

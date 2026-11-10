@@ -18,6 +18,13 @@ export const LIBRARY_STYLES: Record<string, BlockStyle> = {
   carpetGold: { color: 0x9a7a3e, jitter: 0.04, castShadow: false, texture: 'carpet', texScale: 4, roughness: 0.9 },
   brass: { color: 0xb08d4a, emissive: 0x2e1f06, emissiveIntensity: 0.4, jitter: 0.06, texture: 'brass', texScale: 4, roughness: 0.35, metalness: 0.8 },
   goldFoil: { color: 0xd8b56a, emissive: 0x7a5410, emissiveIntensity: 0.9, castShadow: false, roughness: 0.3, metalness: 0.9 },
+  // Carved gilt that catches light but doesn't glow (rosettes, keystones, sunburst rays).
+  giltDim: { color: 0xa88a48, emissive: 0x2a1a04, emissiveIntensity: 0.12, roughness: 0.45, metalness: 0.7 },
+  // Door leaves: a warmer, lighter wood than the doorway frame so the leaves stand out.
+  doorWood: { color: 0x6e4122, jitter: 0.05, texture: 'grain', texScale: 2, roughness: 0.5 },
+  doorPanel: { color: 0x84502a, jitter: 0.05, texture: 'grain', texScale: 2, roughness: 0.45 },
+  doorHighlight: { color: 0xb07a44, castShadow: false, roughness: 0.4 },
+  doorShadow: { color: 0x1a0d06, castShadow: false, roughness: 0.9 },
   wax: { color: 0xefe3c4, jitter: 0.05, castShadow: false, texture: 'paper', texScale: 4, roughness: 0.8 },
   flame: { color: 0xffd27a, emissive: 0xff9a2a, emissiveIntensity: 2.0, castShadow: false },
   shade: { color: 0xefe3c4, emissive: 0xffb866, emissiveIntensity: 1.1, castShadow: false, texture: 'paper', texScale: 4 },
@@ -39,7 +46,7 @@ export const BOOKS = ['bookRed', 'bookBurgundy', 'bookUmber', 'bookBrown', 'book
  * Room extents (inner floor is x -13..13, z -18..front-1; walls at x ±14 and z -19).
  * The hall runs well past the entrance camera (z ≈ 10.5) so turning the head never shows a void.
  */
-export const ROOM = { halfW: 14, back: -19, front: 14, height: 12, shelfTop: 9 }
+export const ROOM = { halfW: 14, back: -19, front: 14, height: 15, shelfTop: 9 } // tall hall: room for grand doors
 
 export type Wall = 'back' | 'left' | 'right'
 
@@ -52,6 +59,9 @@ export interface DoorSpot {
   normal: THREE.Vector3
   width: number
   height: number
+  /** Height of the door leaves (world units), below the transom. */
+  leafHeight: number
+  grand: boolean
 }
 
 export interface PortraitSpot {
@@ -68,18 +78,8 @@ export interface ContactShadow {
   d: number
 }
 
-/** The far end of the passage behind a door, where a warm glow hints at the room beyond. */
-export interface Passage {
-  id: ExhibitId
-  far: THREE.Vector3
-  normal: THREE.Vector3
-  width: number
-  height: number
-}
-
 export interface LibraryInfo {
   contactShadows: ContactShadow[]
-  passages: Passage[]
   doors: DoorSpot[]
   portraits: PortraitSpot[]
   chandeliers: THREE.Vector3[]
@@ -94,16 +94,27 @@ interface DoorDef {
   at: number
   halfWidth: number
   height: number
+  /** The grandest doorway: a two-step arched transom. */
+  grand?: boolean
 }
 
+/**
+ * Grand doorways, as tall as the geometry allows: side-wall placards must clear the clerestory
+ * windows and the Projects placard must stay under the ceiling. Projects (II) is the grandest.
+ */
 const DOOR_DEFS: DoorDef[] = [
-  { id: 'about', wall: 'back', at: -8, halfWidth: 1, height: 5 },
-  { id: 'projects', wall: 'back', at: 0, halfWidth: 2, height: 7 },
-  { id: 'skills', wall: 'back', at: 8, halfWidth: 1, height: 5 },
-  { id: 'resume', wall: 'left', at: -13, halfWidth: 1, height: 5 },
-  { id: 'cv', wall: 'left', at: -6, halfWidth: 1, height: 5 },
-  { id: 'experience', wall: 'right', at: -13, halfWidth: 1, height: 5 },
+  { id: 'about', wall: 'back', at: -8, halfWidth: 1, height: 7 },
+  { id: 'projects', wall: 'back', at: 0, halfWidth: 2, height: 10, grand: true },
+  { id: 'skills', wall: 'back', at: 8, halfWidth: 1, height: 7 },
+  { id: 'resume', wall: 'left', at: -13, halfWidth: 1, height: 7 },
+  { id: 'cv', wall: 'left', at: -6, halfWidth: 1, height: 7 },
+  { id: 'experience', wall: 'right', at: -13, halfWidth: 1, height: 7 },
 ]
+
+/** Rows of the opening filled by the door leaves; the rows above form the arched transom. */
+export function leafRows(d: { height: number; grand?: boolean }): number {
+  return d.grand ? d.height - 2 : d.height - 1
+}
 
 /** Range along the right wall kept clear of shelves for the framed links. */
 const PORTRAIT_RANGE = [-9, -2]
@@ -127,12 +138,17 @@ function wallRange(wall: Wall): [number, number] {
   return wall === 'back' ? [-ROOM.halfW, ROOM.halfW] : [ROOM.back, ROOM.front - 1]
 }
 
+/** The opening's voxel arch: full width below, stepping in at the top (twice for the grand door). */
 function inOpening(d: DoorDef, u: number, y: number): boolean {
   const off = Math.abs(u - d.at)
-  if (y < 1) return false
-  if (y < d.height) return off <= d.halfWidth
-  if (y === d.height) return off <= d.halfWidth - 1 // stepped arch
-  return false
+  if (y < 1 || y > d.height) return false
+  if (d.grand) {
+    if (y === d.height) return off <= d.halfWidth - 2
+    if (y === d.height - 1) return off <= d.halfWidth - 1
+    return off <= d.halfWidth
+  }
+  if (y === d.height) return off <= d.halfWidth - 1
+  return off <= d.halfWidth
 }
 
 export function buildLibrary(b: VoxelBuilder, rand: () => number): LibraryInfo {
@@ -151,7 +167,6 @@ export function buildLibrary(b: VoxelBuilder, rand: () => number): LibraryInfo {
   const sconces: THREE.Vector3[] = []
   const shelfTops: Array<{ x: number; z: number }> = []
   const contactShadows: ContactShadow[] = []
-  const passages: Passage[] = []
 
   for (const wall of ['back', 'left', 'right'] as Wall[]) {
     const [u0, u1] = wallRange(wall)
@@ -166,38 +181,106 @@ export function buildLibrary(b: VoxelBuilder, rand: () => number): LibraryInfo {
         b.set(style, ...cell(wall, u, y, 0))
       }
 
-    // ---------- Passages beyond each door: a short hall glowing at the far end ----------
+    // ---------- Arched transoms: carved panels filling the opening above the door leaves ----------
     for (const d of defs) {
-      const depth = 4
-      for (let k = -1; k >= -depth; k--) {
-        for (let u = d.at - d.halfWidth - 1; u <= d.at + d.halfWidth + 1; u++) {
-          b.set(u % 2 === 0 ? 'floorA' : 'floorB', ...cell(wall, u, 0, k))
-          b.set('ceiling', ...cell(wall, u, d.height + 1, k))
+      const n = wallNormal(wall)
+      for (let y = leafRows(d) + 1; y <= d.height; y++)
+        for (let u = d.at - d.halfWidth; u <= d.at + d.halfWidth; u++) {
+          if (!inOpening(d, u, y)) continue
+          const [x, , z] = cell(wall, u, y, 0)
+          const q = new THREE.Vector3(x, y, z).addScaledVector(n, -0.1)
+          b.prop('woodDark', q.x, q.y, q.z, wall === 'back' ? 1 : 0.8, 1, wall === 'back' ? 0.8 : 1)
         }
-        for (let y = 1; y <= d.height; y++) {
-          const style = y <= 2 ? 'wainscot' : 'maroon'
-          b.set(style, ...cell(wall, d.at - d.halfWidth - 1, y, k))
-          b.set(style, ...cell(wall, d.at + d.halfWidth + 1, y, k))
+      // A gilded transom bar where the arch meets the doors, and gilt edging up each arch step.
+      const bar = new THREE.Vector3(...cell(wall, d.at, leafRows(d) + 0.5, 0)).addScaledVector(n, 0.42)
+      const span = d.halfWidth * 2 + 1
+      b.prop('goldFoil', bar.x, bar.y, bar.z, wall === 'back' ? span : 0.12, 0.14, wall === 'back' ? 0.12 : span)
+      for (let y = leafRows(d) + 1; y <= d.height; y++) {
+        let off = 0
+        while (inOpening(d, d.at + off + 1, y)) off++
+        for (const side of [-1, 1]) {
+          const edge = new THREE.Vector3(...cell(wall, d.at + side * (off + 0.5), y, 0)).addScaledVector(n, 0.42)
+          b.prop('goldFoil', edge.x, edge.y, edge.z, wall === 'back' ? 0.1 : 0.12, 1, wall === 'back' ? 0.12 : 0.1)
         }
       }
-      for (let u = d.at - d.halfWidth - 1; u <= d.at + d.halfWidth + 1; u++)
-        for (let y = 1; y <= d.height; y++) b.set('beyond', ...cell(wall, u, y, -depth - 1))
-      silhouetteFor(b, d, wall, -depth + 1)
-      passages.push({
-        id: d.id,
-        far: new THREE.Vector3(...cell(wall, d.at, 0.5 + d.height / 2, -depth)).addScaledVector(wallNormal(wall), -0.45),
-        normal: wallNormal(wall),
-        width: d.halfWidth * 2 + 1,
-        height: d.height,
-      })
+      const along = wall === 'back' ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 0, -1)
+      // Rotation about the wall normal, for props lying in the wall plane.
+      const inPlane = (a: number) => (wall === 'back' ? { z: a } : { x: wall === 'left' ? a : -a })
+      const flat = (sx: number, sy: number, depth: number): [number, number, number] =>
+        wall === 'back' ? [sx, sy, depth] : [depth, sy, sx]
+      if (d.grand) {
+        // A gilded sunburst fanning up from a stepped hub, filling the arched transom.
+        const hub = new THREE.Vector3(...cell(wall, d.at, leafRows(d) + 0.62, 0)).addScaledVector(n, 0.4)
+        for (let i = 0; i < 11; i++) {
+          const a = (Math.PI * (i + 0.5)) / 11 // 8°..172° from the horizontal
+          const len = 0.9 + Math.sin(a) * 0.95
+          const dir = along.clone().multiplyScalar(Math.cos(a)).setY(Math.sin(a))
+          const c = hub.clone().addScaledVector(dir, len / 2 + 0.25)
+          b.prop('giltDim', c.x, c.y, c.z, ...flat(0.07, len, 0.04), inPlane(a - Math.PI / 2))
+        }
+        for (const [w, h, y] of [[1.2, 0.18, 0], [0.8, 0.18, 0.16], [0.4, 0.16, 0.3]] as const) {
+          const c = hub.clone().setY(hub.y + y)
+          b.prop('giltDim', c.x, c.y, c.z, ...flat(w, h, 0.06))
+        }
+      } else {
+        // A rounded voxel rosette: a gilt boss ringed by eight petals (dim, so it doesn't glow).
+        const rosette = new THREE.Vector3(...cell(wall, d.at, leafRows(d) + 0.95, 0)).addScaledVector(n, 0.4)
+        b.prop('giltDim', rosette.x, rosette.y, rosette.z, ...flat(0.22, 0.22, 0.08))
+        for (let i = 0; i < 8; i++) {
+          const a = (i / 8) * Math.PI * 2
+          const c = rosette.clone().addScaledVector(along, Math.cos(a) * 0.24).setY(rosette.y + Math.sin(a) * 0.24)
+          b.prop('giltDim', c.x, c.y, c.z, ...flat(0.13, 0.13, 0.05), inPlane(a))
+        }
+        b.prop('trimWood', rosette.x, rosette.y, rosette.z - 0.0, ...flat(0.7, 0.7, 0.03))
+      }
+      const key = new THREE.Vector3(...cell(wall, d.at, d.height + 1, 1)).addScaledVector(n, 0.12)
+      b.prop('giltDim', key.x, key.y, key.z, 0.5, 0.75, 0.5)
+
+      if (d.grand) {
+        // A projecting cornice over the doorway and a broken pediment whose break frames the plaque.
+        const cy = d.height + 1.55
+        const corn = new THREE.Vector3(...cell(wall, d.at, cy, 1)).addScaledVector(n, 0.15)
+        const span = d.halfWidth * 2 + 6
+        b.prop('crown', corn.x, corn.y, corn.z, ...flat(span, 0.22, 0.9))
+        b.prop('giltDim', corn.x, corn.y - 0.13, corn.z + (wall === 'back' ? 0.46 : 0), ...flat(span, 0.05, 0.04))
+        for (const side of [-1, 1]) {
+          for (let k = 0; k < 3; k++) {
+            const outer = d.halfWidth + 3 - k * 0.55
+            const inner = d.halfWidth + 1.95
+            const mid = (outer + inner) / 2
+            const c = corn.clone().addScaledVector(along, side * mid).setY(cy + 0.3 + k * 0.32)
+            b.prop('trimWood', c.x, c.y, c.z, ...flat(outer - inner, 0.32, 0.7))
+            b.prop('giltDim', c.x, c.y + 0.17, c.z, ...flat(outer - inner, 0.04, 0.72))
+          }
+          const fin = corn.clone().addScaledVector(along, side * (d.halfWidth + 2.2)).setY(cy + 1.45)
+          b.prop('giltDim', fin.x, fin.y, fin.z, 0.26, 0.42, 0.26)
+        }
+      }
     }
 
     // ---------- Door frames ----------
     for (const d of defs) {
       const frameStyle = 'woodDark'
+      const n = wallNormal(wall)
+      const along = wall === 'back' ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 0, 1)
       for (let y = 1; y <= d.height + 1; y++) {
         b.set(frameStyle, ...cell(wall, d.at - d.halfWidth - 1, y, 1))
         b.set(frameStyle, ...cell(wall, d.at + d.halfWidth + 1, y, 1))
+      }
+      // Fluted pilasters: dark grooves down each post's face, with a base and a gilded capital.
+      for (const side of [-1, 1]) {
+        const [px, , pz] = cell(wall, d.at + side * (d.halfWidth + 1), 0, 1)
+        const face = new THREE.Vector3(px, 0, pz).addScaledVector(n, 0.5)
+        const top = d.height + 0.9
+        for (const k of [-0.28, 0, 0.28]) {
+          const g = face.clone().addScaledVector(along, k).setY((1.6 + top) / 2)
+          if (wall === 'back') b.prop('ceiling', g.x, g.y, g.z, 0.07, top - 1.6, 0.04)
+          else b.prop('ceiling', g.x, g.y, g.z, 0.04, top - 1.6, 0.07)
+        }
+        const base = face.clone().setY(1.0)
+        b.prop('trimWood', base.x, base.y, base.z, wall === 'back' ? 1.15 : 0.3, 1.0, wall === 'back' ? 0.3 : 1.15)
+        const cap = face.clone().setY(d.height + 1.05)
+        b.prop('goldFoil', cap.x, cap.y, cap.z, wall === 'back' ? 1.15 : 0.22, 0.16, wall === 'back' ? 0.22 : 1.15)
       }
       for (let u = d.at - d.halfWidth - 1; u <= d.at + d.halfWidth + 1; u++) b.set('trimWood', ...cell(wall, u, d.height + 1, 1))
       // Brass caps on the frame posts.
@@ -207,7 +290,6 @@ export function buildLibrary(b: VoxelBuilder, rand: () => number): LibraryInfo {
       }
 
       const [cx, , cz] = cell(wall, d.at, 0, 0)
-      const n = wallNormal(wall)
       doors.push({
         id: d.id,
         wall,
@@ -215,13 +297,15 @@ export function buildLibrary(b: VoxelBuilder, rand: () => number): LibraryInfo {
         normal: n,
         width: d.halfWidth * 2 + 1,
         height: d.height,
+        leafHeight: leafRows(d),
+        grand: !!d.grand,
       })
 
       // Candle sconces flanking each door, just above the shelves' base.
       for (const side of [-1, 1]) {
         const [x, y, z] = cell(wall, d.at + side * (d.halfWidth + 2), 0, 1)
         const p = new THREE.Vector3(x, y, z).addScaledVector(n, -0.2)
-        const sconce = p.clone().setY(ROOM.shelfTop + 1.2)
+        const sconce = p.clone().setY(ROOM.shelfTop + 2.9) // above the placards, below the windows
         b.prop('brass', sconce.x, sconce.y - 0.3, sconce.z, 0.35, 0.15, 0.35)
         b.prop('wax', sconce.x, sconce.y, sconce.z, 0.14, 0.45, 0.14)
         b.prop('flame', sconce.x, sconce.y + 0.32, sconce.z, 0.1, 0.18, 0.1)
@@ -278,6 +362,28 @@ export function buildLibrary(b: VoxelBuilder, rand: () => number): LibraryInfo {
         shelfRow(b, rand, wall, x, y, z, along, n)
       }
     }
+  }
+
+  // A gallery balustrade along the shelf tops, and a carved frieze under the crown, so the
+  // taller walls read as a two-level library rather than stretched wallpaper.
+  for (const t of shelfTops) {
+    const top = ROOM.shelfTop + 0.5
+    b.prop('trimWood', t.x, top + 0.04, t.z, 1, 0.08, 1)
+    for (const off of [-0.25, 0.25]) {
+      const px = t.x + (Math.abs(t.z - ROOM.back) < 1.5 ? off : 0) // back wall runs along x
+      const pz = t.z + (Math.abs(t.z - ROOM.back) < 1.5 ? 0 : off)
+      // Keep posts at the front edge of the shelf top.
+      const nx = Math.abs(t.z - ROOM.back) < 1.5 ? 0 : Math.sign(-t.x) * 0.38
+      const nz = Math.abs(t.z - ROOM.back) < 1.5 ? 0.38 : 0
+      b.prop('woodDark', px + nx, top + 0.38, pz + nz, 0.1, 0.62, 0.1)
+    }
+    const fx = Math.abs(t.z - ROOM.back) < 1.5 ? 0 : Math.sign(-t.x) * 0.38
+    const fz = Math.abs(t.z - ROOM.back) < 1.5 ? 0.38 : 0
+    b.prop('tableWood', t.x + fx, top + 0.72, t.z + fz, Math.abs(fz) > 0 ? 1 : 0.16, 0.1, Math.abs(fz) > 0 ? 0.16 : 1)
+  }
+  for (const wall of ['back', 'left', 'right'] as Wall[]) {
+    const [u0, u1] = wallRange(wall)
+    for (let u = u0; u <= u1; u++) b.set('trimWood', ...cell(wall, u, ROOM.height - 1, 0))
   }
 
   // Books lying flat on top of some shelf bays.
@@ -341,7 +447,7 @@ export function buildLibrary(b: VoxelBuilder, rand: () => number): LibraryInfo {
 
   // ---------- Chandeliers ----------
   // A third chandelier lights the extended entrance end; it hangs above the resting view.
-  const chandeliers = [new THREE.Vector3(0, 10.4, -4.5), new THREE.Vector3(0, 10.4, -9.5), new THREE.Vector3(0, 10.4, 7.5)]
+  const chandeliers = [new THREE.Vector3(0, 13.2, -4.5), new THREE.Vector3(0, 13.2, -9.5), new THREE.Vector3(0, 13.2, 7.5)]
   for (const c of chandeliers) {
     b.prop('brass', c.x, (c.y + ROOM.height + 1) / 2, c.z, 0.08, ROOM.height + 1 - c.y, 0.08)
     b.prop('brass', c.x, c.y, c.z, 0.5, 1.1, 0.5)
@@ -367,7 +473,7 @@ export function buildLibrary(b: VoxelBuilder, rand: () => number): LibraryInfo {
     b.prop('brass', frame.x, frame.y, frame.z, 0.12, 2.95, 2.3)
   }
 
-  return { contactShadows, passages, doors, portraits, chandeliers, tableCandles, sconces }
+  return { contactShadows, doors, portraits, chandeliers, tableCandles, sconces }
 }
 
 /** One shelf row: books of varied height and thickness, a few leaning, some with gold-foil bands. */
@@ -450,54 +556,4 @@ function chair(b: VoxelBuilder, x: number, z: number, side: number): void {
   for (const dz of [-0.36, 0.36]) b.prop('woodDark', bx, 1.85, z + dz, 0.1, 1.2, 0.1) // back posts
   b.prop('tableWood', bx, 2.42, z, 0.12, 0.1, 0.84) // top rail
   b.prop('leather', bx - side * 0.02, 1.9, z, 0.06, 0.8, 0.62) // padded back
-}
-
-/** A dark silhouette of each exhibit's centrepiece, seen against the glow down the passage. */
-function silhouetteFor(b: VoxelBuilder, d: DoorDef, wall: Wall, k: number): void {
-  const at = (du: number, y: number, dk = 0): [number, number, number] => {
-    const [x, , z] = cell(wall, d.at + du, 0, k + dk)
-    return [x, y, z]
-  }
-  const S = 'silhouette'
-  switch (d.id) {
-    case 'projects': // glass cases on plinths
-      for (const du of [-1.4, 0, 1.4]) {
-        const [x, , z] = at(du, 0)
-        b.prop(S, x, 1.0, z, 0.8, 1.0, 0.8)
-        b.prop(S, x, 1.85, z, 0.6, 0.7, 0.6)
-      }
-      break
-    case 'skills': {
-      // card catalog cabinet
-      const [x, , z] = at(0, 0)
-      b.prop(S, x, 2.0, z, 2.0, 3.0, 0.9)
-      break
-    }
-    case 'about': {
-      // writing desk and chair
-      const [x, , z] = at(0, 0)
-      b.prop(S, x, 1.4, z, 2.0, 0.15, 0.9)
-      b.prop(S, x - 0.8, 0.95, z, 0.15, 0.8, 0.7)
-      b.prop(S, x + 0.8, 0.95, z, 0.15, 0.8, 0.7)
-      b.prop(S, x, 1.9, z, 0.9, 0.9, 0.12)
-      break
-    }
-    case 'resume':
-    case 'cv': {
-      // lectern
-      const [x, , z] = at(0, 0)
-      b.prop(S, x, 1.3, z, 0.25, 1.6, 0.25)
-      b.prop(S, x, 2.15, z, 0.9, 0.12, 0.7)
-      b.prop(S, x, 0.55, z, 0.8, 0.12, 0.8)
-      break
-    }
-    case 'experience': {
-      // framed timeline on the far wall
-      for (const du of [-1, 0, 1]) {
-        const [x, , z] = at(du * 1.1, 0, -0.9)
-        b.prop(S, x, 3.2, z, 0.8, 1.0, 0.8)
-      }
-      break
-    }
-  }
 }

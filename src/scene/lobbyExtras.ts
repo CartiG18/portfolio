@@ -16,9 +16,10 @@ const WALL_FACE = 13.5 // inner face of the side walls (x = ±13.5)
 
 // Windows sit above the shelving, clear of the door sconces, placards and portraits.
 const WINDOW_Z = [-12.5, -5.5, 1.5, 8]
-const WINDOW_Y = 10.85
+// Full height, above the placards over the grand doors (the hall ceiling was raised for them).
+const WINDOW_Y = 12.75
 const WINDOW_W = 3.0
-const WINDOW_H = 3.15
+const WINDOW_H = 3.2
 
 function canvasTexture(w: number, h: number, draw: (g: CanvasRenderingContext2D) => void): THREE.CanvasTexture {
   const c = document.createElement('canvas')
@@ -34,7 +35,7 @@ function canvasTexture(w: number, h: number, draw: (g: CanvasRenderingContext2D)
 /** Arched leaded glass with a thin stained border and a gilded frame (alpha outside the arch). */
 function windowTexture(): THREE.CanvasTexture {
   const w = 256
-  const h = 360
+  const h = Math.round((256 * WINDOW_H) / WINDOW_W)
   return canvasTexture(w, h, (g) => {
     const r = w / 2
     const arch = (inset: number) => {

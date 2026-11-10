@@ -158,11 +158,17 @@ document.addEventListener('keydown', (event) => {
 })
 
 // Sound is off until the visitor turns it on; the click is the gesture that unlocks audio.
+// Sound is on by default (it starts on the first click or key press anywhere); the toggle
+// always shows the real setting, and turning it off is remembered.
 const soundToggle = document.querySelector<HTMLButtonElement>('#sound-toggle')!
-soundToggle.addEventListener('click', () => {
-  sound.setEnabled(!sound.on)
+const syncSoundToggle = () => {
   soundToggle.setAttribute('aria-pressed', String(sound.on))
   soundToggle.querySelector('[data-sound-state]')!.textContent = sound.on ? 'on' : 'off'
+}
+syncSoundToggle()
+soundToggle.addEventListener('click', () => {
+  sound.setEnabled(!sound.on)
+  syncSoundToggle()
 })
 
 window.addEventListener('hashchange', () => {

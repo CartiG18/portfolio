@@ -139,7 +139,16 @@ export class VoxelBuilder {
     this.push(style, { x, y, z, sx, sy, sz, rot })
   }
 
-  build(): THREE.Group {
+  /**
+   * @param viewFrom Where the camera usually is. Instances are ordered nearest-first so the
+   *   depth test rejects hidden cubes before they're shaded (large forests were paying full
+   *   shading, including shadow sampling, for cubes later covered by nearer ones).
+   */
+  build(viewFrom?: THREE.Vector3): THREE.Group {
+    if (viewFrom) {
+      const d = (b: Block) => (b.x - viewFrom.x) ** 2 + (b.y - viewFrom.y) ** 2 + (b.z - viewFrom.z) ** 2
+      for (const list of this.blocks.values()) list.sort((a, b) => d(a) - d(b))
+    }
     const group = new THREE.Group()
     const matrix = new THREE.Matrix4()
     const color = new THREE.Color()
