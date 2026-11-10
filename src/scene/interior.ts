@@ -6,10 +6,12 @@ import { createMotes } from './atmosphere.ts'
 import { contactShadowTexture, doorGlowTexture, ensureFonts, placardTexture, portraitTexture, softGlowTexture } from './labels.ts'
 import { findExhibit } from '../data/exhibits.ts'
 import { ACCENT, PALETTE } from './palette.ts'
-import { socialLinks } from '../data/site.ts'
+import { contactLabel, openEmail, socialLinks } from '../data/site.ts'
 import { bookNotes } from '../data/content.ts'
 import { sound } from '../audio.ts'
-import { SOCIAL_ICON_PATHS } from '../data/icons.ts'
+import { createClerestories, createClock, createSunlight } from './lobbyExtras.ts'
+import { createDayBlend, toggleTimeOfDay } from './timeOfDay.ts'
+import { EMAIL_ICON_PATH, SOCIAL_ICON_PATHS } from '../data/icons.ts'
 
 export interface InteriorOptions {
   canvas: HTMLCanvasElement
@@ -44,22 +46,31 @@ export async function createInterior(opts: InteriorOptions): Promise<InteriorHan
     canvas: opts.canvas,
     reducedMotion: opts.reducedMotion,
     background: 0x080504,
-    fog: { near: 32, far: 70 },
+    fog: { near: 40, far: 80 },
     exposure: 1.0,
     bloom: { strength: 0.45, radius: 0.4, threshold: 0.9 },
     grade: { vignette: 0.55, grain: 0.035, warmth: 0.6 },
-    // Standing just inside the entrance at eye level (~2.8 blocks above the floor),
+    // Standing at the entrance end of the hall at eye level (~2.8 blocks above the floor),
     // facing the Projects Gallery doors.
     camera: {
       fov: 58,
-      position: new THREE.Vector3(0, 3.3, 0),
-      target: new THREE.Vector3(0, 4.6, -19),
+      // Stepped back from the doors so all six doors and placards fit at rest, including the
+      // CV door near the entrance end of the left wall.
+      position: new THREE.Vector3(0, 3.3, 10.5),
+      refAspect: 1.83,
+      // Pitched up ~7° so the doors and placards sit near the vertical centre, not above a
+      // half-frame of empty runner.
+      target: new THREE.Vector3(0, 7.0, -19),
     },
     lookAround: { yawDeg: 38, pitchDeg: 12 },
   })
   const { scene } = stage
   const libraryGroup = builder.build()
   scene.add(libraryGroup)
+  // Wood, shelving and walls lift by day (emissive materials like flames are left alone).
+  const liftMats = libraryGroup.children
+    .map((m) => (m as THREE.Mesh).material as THREE.MeshStandardMaterial)
+    .filter((m) => m.emissive.getHex() === 0x000000 || m.emissiveIntensity < 0.6)
   const flameMats = libraryGroup.children
     .filter((m) => m.name === 'flame')
     .map((m) => (m as THREE.Mesh).material as THREE.MeshStandardMaterial)
@@ -116,8 +127,9 @@ export async function createInterior(opts: InteriorOptions): Promise<InteriorHan
     const facing = Math.atan2(door.normal.x, door.normal.z)
 
     // Hover is an interactive state, so the light from beyond takes the cool accent.
+    // A paler, whiter cyan than ACCENT: over the warm passage light, full ACCENT reads green-teal.
     const glowMat = new THREE.MeshBasicMaterial({
-      color: ACCENT,
+      color: 0xd6f2f6,
       map: glowTexture,
       transparent: true,
       opacity: 0,
@@ -131,14 +143,16 @@ export async function createInterior(opts: InteriorOptions): Promise<InteriorHan
     scene.add(glow)
     doorGlows.set(door.id, glowMat)
 
-    const plateWidth = door.width + 1.8
+    // Sized to stay legible from the stepped-back entrance.
+    // Side-wall plaques are a little smaller, leaving a clear gap between Résumé and CV.
+    const plateWidth = (door.width + 1.8) * (door.wall === 'back' ? 1.35 : 1.25)
     const plate = new THREE.Mesh(
       new THREE.PlaneGeometry(plateWidth, plateWidth * 0.29),
       new THREE.MeshBasicMaterial({ map: placardTexture(`Exhibit ${exhibit.number}`, exhibit.title) }),
     )
     plate.position
       .copy(door.center)
-      .setY(0.5 + door.height + 2.1)
+      .setY(0.5 + door.height + 2.4)
       .addScaledVector(door.normal, 1.02)
     plate.rotation.y = facing
     scene.add(plate)
@@ -235,20 +249,23 @@ export async function createInterior(opts: InteriorOptions): Promise<InteriorHan
 
   // ---------- Framed portraits linking out ----------
   for (const p of lib.portraits) {
-    const link = socialLinks.find((l) => l.id === p.id)!
-    const canvas = new THREE.Mesh(
-      new THREE.PlaneGeometry(2.4, 3),
-      new THREE.MeshBasicMaterial({ map: portraitTexture(SOCIAL_ICON_PATHS[p.id], link.label) }),
-    )
+    const isEmail = p.id === 'email'
+    const link = isEmail ? undefined : socialLinks.find((l) => l.id === p.id)
+    const map = isEmail
+      ? portraitTexture(EMAIL_ICON_PATH, 'Email', 'evenodd')
+      : portraitTexture(SOCIAL_ICON_PATHS[p.id as 'github' | 'linkedin'], link!.label)
+    const canvas = new THREE.Mesh(new THREE.PlaneGeometry(1.95, 2.45), new THREE.MeshBasicMaterial({ map }))
     canvas.position.copy(p.center).addScaledVector(p.normal, 0.13)
     canvas.rotation.y = Math.atan2(p.normal.x, p.normal.z)
     scene.add(canvas)
-    if (link.href) stage.addPickable({ id: `link:${p.id}`, object: canvas })
+    if (isEmail || link?.href) stage.addPickable({ id: `link:${p.id}`, object: canvas })
   }
+  void contactLabel
 
   // ---------- Candlelight ----------
   // Warm bounce from below lights the ceiling and beams.
-  scene.add(new THREE.HemisphereLight(0x9a7a58, 0x6a4428, 0.9))
+  const hemi = new THREE.HemisphereLight(0x9a7a58, 0x6a4428, 0.9)
+  scene.add(hemi)
   const fill = new THREE.DirectionalLight(0xffc890, 0.35)
   fill.position.set(6, 30, 20)
   scene.add(fill)
@@ -266,7 +283,8 @@ export async function createInterior(opts: InteriorOptions): Promise<InteriorHan
     flickering.push({ light, base: intensity, seed: rand() * 100 })
   }
   // No point-light shadows: each costs six extra scene renders; contact shadows ground the furniture.
-  lib.chandeliers.forEach((c) => addCandleLight(c.clone().setY(c.y - 0.6), 55, 26))
+  // Lights hang well below each chandelier so its brass isn't blown out to white.
+  lib.chandeliers.forEach((c) => addCandleLight(c.clone().setY(c.y - 2.2), 42, 26))
   for (const x of [-6.5, 6.5]) addCandleLight(new THREE.Vector3(x, 3.2, -9), 16, 9)
   addCandleLight(new THREE.Vector3(0, 6, -15), 20, 14)
   for (const x of [-10, 10]) addCandleLight(new THREE.Vector3(x, 6, -14), 18, 13)
@@ -285,6 +303,27 @@ export async function createInterior(opts: InteriorOptions): Promise<InteriorHan
     rand,
   )
   scene.add(motes)
+
+  // ---------- Day/night: clerestory windows, sunlight, the grandfather clock ----------
+  const clerestories = createClerestories(scene, brassMat)
+  const sunlight = createSunlight(scene, rand)
+  const clock = createClock(scene)
+  stage.addPickable({ id: 'clock', object: clock.hit })
+  const dayBlend = createDayBlend(opts.reducedMotion)
+  const hemiNight = { sky: new THREE.Color(0x9a7a58), ground: new THREE.Color(0x6a4428) }
+  const hemiDay = { sky: new THREE.Color(0xd9b98c), ground: new THREE.Color(0x8a6038) }
+  const lerp = (a: number, b: number, t: number) => a + (b - a) * t
+  let lastBlend = -1
+  function applyTimeOfDay(b: number): void {
+    hemi.color.lerpColors(hemiNight.sky, hemiDay.sky, b)
+    hemi.groundColor.lerpColors(hemiNight.ground, hemiDay.ground, b)
+    hemi.intensity = lerp(0.9, 1.75, b)
+    fill.intensity = lerp(0.35, 0.95, b)
+    for (const m of liftMats) m.color.setScalar(lerp(1, 1.35, b))
+    stage.setLook({ exposure: lerp(1.0, 1.28, b), warmth: lerp(0.6, 0.8, b), vignette: lerp(0.55, 0.4, b) })
+    clerestories.update(b)
+  }
+  applyTimeOfDay(dayBlend.value)
 
   // ---------- Featured books: pull one out to find a note tucked inside ----------
   const bookSpots: Array<[THREE.Vector3, THREE.Vector3, THREE.Vector3]> = [
@@ -341,6 +380,12 @@ export async function createInterior(opts: InteriorOptions): Promise<InteriorHan
   let hovered: string | null = null
   stage.onHover = (id) => (hovered = id)
   stage.onPick = (id) => {
+    if (id === 'clock') {
+      // Winding the clock flips the time of day; the camera stays put.
+      toggleTimeOfDay()
+      sound.chime()
+      return
+    }
     if (id.startsWith('book:')) {
       const i = Number(id.slice(5))
       setBook(pulledBook === i ? null : i)
@@ -348,6 +393,10 @@ export async function createInterior(opts: InteriorOptions): Promise<InteriorHan
     }
     if (pulledBook !== null) setBook(null)
     if (!id) return
+    if (id === 'link:email') {
+      openEmail()
+      return
+    }
     if (id.startsWith('link:')) {
       const link = socialLinks.find((l) => `link:${l.id}` === id)
       if (link?.href) window.open(link.href, '_blank', 'noopener,noreferrer')
@@ -362,13 +411,22 @@ export async function createInterior(opts: InteriorOptions): Promise<InteriorHan
   const timeScale = opts.reducedMotion ? 0.3 : 1
   stage.addTicker((time, dt) => {
     motes.material.uniforms.uTime.value = time * timeScale
+    const day = dayBlend.update(time)
+    if (day !== lastBlend) {
+      applyTimeOfDay(day)
+      lastBlend = day
+    }
+    sunlight.update(day, time * timeScale)
+    clock.update(day, time, dt, hovered === 'clock', opts.reducedMotion)
+    // Candles stay lit by day but read weaker against the daylight.
+    const candle = lerp(1, 0.7, day)
     for (const f of flickering) {
       const t = time * timeScale + f.seed
-      f.light.intensity = f.base * (0.88 + Math.sin(t * 9) * 0.05 + Math.sin(t * 23) * 0.04 + Math.sin(t * 3.1) * 0.03)
+      f.light.intensity = f.base * candle * (0.88 + Math.sin(t * 9) * 0.05 + Math.sin(t * 23) * 0.04 + Math.sin(t * 3.1) * 0.03)
     }
     // The flames themselves flicker slightly too.
     const ft = time * timeScale
-    for (const m of flameMats) m.emissiveIntensity = 2.0 * (0.85 + Math.sin(ft * 13) * 0.08 + Math.sin(ft * 29) * 0.05)
+    for (const m of flameMats) m.emissiveIntensity = 2.0 * candle * (0.85 + Math.sin(ft * 13) * 0.08 + Math.sin(ft * 29) * 0.05)
     const k = Math.min(1, dt * 8)
     for (const [id, mat] of doorGlows) {
       const on = id === hovered || hovered === `plate:${id}`
@@ -448,6 +506,9 @@ export async function createInterior(opts: InteriorOptions): Promise<InteriorHan
     highlight: (id) => stage.highlight(id),
     pullNextBook: () => setBook(pulledBook === null ? 0 : (pulledBook + 1) % books.length),
     putBookBack: () => setBook(null),
-    dispose: () => stage.dispose(),
+    dispose: () => {
+      dayBlend.dispose()
+      stage.dispose()
+    },
   }
 }

@@ -1,7 +1,9 @@
 import { exhibits } from '../data/exhibits.ts'
-import { site, socialLinks } from '../data/site.ts'
+import { contactLabel, openEmail, site, socialLinks } from '../data/site.ts'
 import { bookNotes } from '../data/content.ts'
 import { esc } from './html.ts'
+import { getTimeOfDay, subscribeTimeOfDay, toggleTimeOfDay, type TimeOfDay } from '../scene/timeOfDay.ts'
+import { sound } from '../audio.ts'
 import type { SceneController } from './grounds.ts'
 
 /**
@@ -26,9 +28,12 @@ export function renderLobby(): string {
       <nav class="lobby-directory" aria-label="Library doors">
         <ul>
           ${doorLinks}${outLinks}
+          <li><button type="button" class="lobby-directory__book" data-email>${esc(contactLabel)} (email)</button></li>
           <li><button type="button" class="lobby-directory__book" data-pull-book>Pull a book from the shelf</button></li>
+          <li><button type="button" class="lobby-directory__book" data-clock aria-pressed="${getTimeOfDay() === 'day'}">${clockLabel(getTimeOfDay())}</button></li>
         </ul>
       </nav>
+      <p class="visually-hidden" data-time-status aria-live="polite"></p>
       <div class="book-note" data-book-note role="status" aria-live="polite" hidden>
         <p class="book-note__text"></p>
         <p class="book-note__source"></p>
@@ -39,6 +44,10 @@ export function renderLobby(): string {
       <p class="scene-hint" data-hint aria-hidden="true">Explore the exhibits</p>
       <div class="scene-view__fade" data-fade></div>
     </div>`
+}
+
+function clockLabel(t: TimeOfDay): string {
+  return `Wind the grandfather clock (switch to ${t === 'day' ? 'night' : 'day'})`
 }
 
 /** Fade a hint out after the visitor's first real interaction with the view. */
@@ -68,6 +77,20 @@ export async function mountLobby(
   const fade = root.querySelector<HTMLElement>('[data-fade]')!
   const note = root.querySelector<HTMLElement>('[data-book-note]')!
   const pullButton = root.querySelector<HTMLButtonElement>('[data-pull-book]')!
+  const clockButton = root.querySelector<HTMLButtonElement>('[data-clock]')!
+  const timeStatus = root.querySelector<HTMLElement>('[data-time-status]')!
+  // Keep the button label and pressed state in sync, and announce changes politely.
+  const unsubscribeTime = subscribeTimeOfDay((t) => {
+    clockButton.textContent = clockLabel(t)
+    clockButton.setAttribute('aria-pressed', String(t === 'day'))
+    timeStatus.textContent = `It is now ${t}`
+  })
+  const onClock = () => {
+    toggleTimeOfDay()
+    sound.chime()
+  }
+  clockButton.addEventListener('click', onClock)
+  root.querySelector('[data-email]')!.addEventListener('click', openEmail)
 
   const showNote = (n: { text: string; source: string } | null, screen?: { x: number; y: number }) => {
     note.hidden = !n
@@ -103,6 +126,9 @@ export async function mountLobby(
       a.addEventListener('focus', onFocus)
       a.addEventListener('blur', onBlur)
     }
+    const onClockFocus = () => scene.highlight('clock')
+    clockButton.addEventListener('focus', onClockFocus)
+    clockButton.addEventListener('blur', onBlur)
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && !note.hidden) scene.putBookBack()
     }
@@ -114,6 +140,10 @@ export async function mountLobby(
       dispose: () => {
         pullButton.removeEventListener('click', onPull)
         stopHint()
+        unsubscribeTime()
+        clockButton.removeEventListener('click', onClock)
+        clockButton.removeEventListener('focus', onClockFocus)
+        clockButton.removeEventListener('blur', onBlur)
         for (const a of doorLinks) {
           a.removeEventListener('focus', onFocus)
           a.removeEventListener('blur', onBlur)
@@ -125,6 +155,11 @@ export async function mountLobby(
   } catch (error) {
     console.warn('3D scene unavailable.', error)
     root.classList.add('no-webgl')
-    return { dispose() {} }
+    return {
+      dispose() {
+        unsubscribeTime()
+        clockButton.removeEventListener('click', onClock)
+      },
+    }
   }
 }

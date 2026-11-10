@@ -35,8 +35,11 @@ export const LIBRARY_STYLES: Record<string, BlockStyle> = {
 // Warm leathers only: oxblood, burgundy, umber, brown, tan, black.
 export const BOOKS = ['bookRed', 'bookBurgundy', 'bookUmber', 'bookBrown', 'bookTan', 'bookBlack', 'bookRed', 'bookBrown']
 
-/** Room extents (inner floor is x -13..13, z -18..0; walls at x ±14 and z -19). */
-const ROOM = { halfW: 14, back: -19, front: 1, height: 12, shelfTop: 9 }
+/**
+ * Room extents (inner floor is x -13..13, z -18..front-1; walls at x ±14 and z -19).
+ * The hall runs well past the entrance camera (z ≈ 10.5) so turning the head never shows a void.
+ */
+export const ROOM = { halfW: 14, back: -19, front: 14, height: 12, shelfTop: 9 }
 
 export type Wall = 'back' | 'left' | 'right'
 
@@ -52,7 +55,7 @@ export interface DoorSpot {
 }
 
 export interface PortraitSpot {
-  id: 'github' | 'linkedin'
+  id: 'github' | 'linkedin' | 'email'
   center: THREE.Vector3
   normal: THREE.Vector3
 }
@@ -104,6 +107,8 @@ const DOOR_DEFS: DoorDef[] = [
 
 /** Range along the right wall kept clear of shelves for the framed links. */
 const PORTRAIT_RANGE = [-9, -2]
+/** Range along the right wall kept clear for the grandfather clock near the entrance. */
+const CLOCK_RANGE = [0, 2]
 
 /** Map (wall, u, y, depth) → world cell. depth 0 = the wall itself, 1 = first cell inside the room. */
 function cell(wall: Wall, u: number, y: number, depth: number): [number, number, number] {
@@ -136,8 +141,10 @@ export function buildLibrary(b: VoxelBuilder, rand: () => number): LibraryInfo {
     for (let z = ROOM.back; z <= ROOM.front + 1; z++) b.set(x % 2 === 0 ? 'floorA' : 'floorB', x, 0, z)
 
   // Maroon runner with a gold border leading to the gallery doors.
-  b.prop('carpetGold', 0, 0.52, -9, 5.6, 0.05, 20.4)
-  b.prop('carpet', 0, 0.55, -9, 5, 0.06, 20)
+  const runnerZ = (ROOM.back + ROOM.front) / 2
+  const runnerLength = ROOM.front - ROOM.back
+  b.prop('carpetGold', 0, 0.52, runnerZ, 5.6, 0.05, runnerLength + 0.4)
+  b.prop('carpet', 0, 0.55, runnerZ, 5, 0.06, runnerLength)
 
   const doorsOn = (wall: Wall) => DOOR_DEFS.filter((d) => d.wall === wall)
   const doors: DoorSpot[] = []
@@ -226,8 +233,9 @@ export function buildLibrary(b: VoxelBuilder, rand: () => number): LibraryInfo {
     const blocked = (u: number) =>
       defs.some((d) => Math.abs(u - d.at) <= d.halfWidth + 1) ||
       (wall === 'right' && u >= PORTRAIT_RANGE[0] && u <= PORTRAIT_RANGE[1]) ||
+      (wall === 'right' && u >= CLOCK_RANGE[0] && u <= CLOCK_RANGE[1]) ||
       (wall === 'back' && Math.abs(u) >= ROOM.halfW - 1) || // corners belong to the side shelves
-      (wall !== 'back' && (u <= ROOM.back || u > 0))
+      (wall !== 'back' && (u <= ROOM.back || u > ROOM.front - 2))
 
     let runIndex = 0
     for (let u = u0; u <= u1; u++) {
@@ -332,7 +340,8 @@ export function buildLibrary(b: VoxelBuilder, rand: () => number): LibraryInfo {
   }
 
   // ---------- Chandeliers ----------
-  const chandeliers = [new THREE.Vector3(0, 10.4, -4.5), new THREE.Vector3(0, 10.4, -9.5)]
+  // A third chandelier lights the extended entrance end; it hangs above the resting view.
+  const chandeliers = [new THREE.Vector3(0, 10.4, -4.5), new THREE.Vector3(0, 10.4, -9.5), new THREE.Vector3(0, 10.4, 7.5)]
   for (const c of chandeliers) {
     b.prop('brass', c.x, (c.y + ROOM.height + 1) / 2, c.z, 0.08, ROOM.height + 1 - c.y, 0.08)
     b.prop('brass', c.x, c.y, c.z, 0.5, 1.1, 0.5)
@@ -348,12 +357,14 @@ export function buildLibrary(b: VoxelBuilder, rand: () => number): LibraryInfo {
   }
 
   const portraits: PortraitSpot[] = [
-    { id: 'github', center: new THREE.Vector3(ROOM.halfW - 0.45, 6.5, -7.5), normal: new THREE.Vector3(-1, 0, 0) },
-    { id: 'linkedin', center: new THREE.Vector3(ROOM.halfW - 0.45, 6.5, -3.5), normal: new THREE.Vector3(-1, 0, 0) },
+    // Three slightly smaller frames side by side: GitHub, LinkedIn, and email.
+    { id: 'github', center: new THREE.Vector3(ROOM.halfW - 0.45, 6.4, -8.1), normal: new THREE.Vector3(-1, 0, 0) },
+    { id: 'linkedin', center: new THREE.Vector3(ROOM.halfW - 0.45, 6.4, -5.55), normal: new THREE.Vector3(-1, 0, 0) },
+    { id: 'email', center: new THREE.Vector3(ROOM.halfW - 0.45, 6.4, -3.0), normal: new THREE.Vector3(-1, 0, 0) },
   ]
   for (const p of portraits) {
     const frame = p.center.clone().addScaledVector(p.normal, 0.05)
-    b.prop('brass', frame.x, frame.y, frame.z, 0.12, 3.6, 2.9)
+    b.prop('brass', frame.x, frame.y, frame.z, 0.12, 2.95, 2.3)
   }
 
   return { contactShadows, passages, doors, portraits, chandeliers, tableCandles, sconces }

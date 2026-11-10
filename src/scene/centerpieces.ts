@@ -17,8 +17,11 @@ export interface ExhibitItem {
   label: string
   /** Object the cursor picks. */
   hit: THREE.Object3D
-  /** Where the camera moves when the item is opened. */
-  view: { position: THREE.Vector3; target: THREE.Vector3 }
+  /**
+   * Where the camera moves when the item is opened. `size` is the object's rough extent
+   * (world units) once open, so the room can frame it clear of the content panel.
+   */
+  view: { position: THREE.Vector3; target: THREE.Vector3; size: number }
   hover: number
   active: number
   /** 0–1 targets the room eases toward each frame. */
@@ -82,7 +85,7 @@ function canvasTexture(w: number, h: number, draw: (g: CanvasRenderingContext2D)
 }
 
 /** Parchment card with a heading and up to a few lines of text. */
-function cardTexture(heading: string, lines: string[]): THREE.CanvasTexture {
+function cardTexture(heading: string, lines: string[], headingSize = 54): THREE.CanvasTexture {
   return canvasTexture(512, 360, (g) => {
     g.fillStyle = '#efe3c4'
     g.fillRect(0, 0, 512, 360)
@@ -93,11 +96,25 @@ function cardTexture(heading: string, lines: string[]): THREE.CanvasTexture {
     g.lineTo(488, 92)
     g.stroke()
     g.fillStyle = '#3a2610'
-    g.font = '700 54px "Cormorant SC", Georgia, serif'
     g.textAlign = 'center'
-    g.fillText(heading, 256, 70)
-    g.font = 'italic 500 38px "Cormorant Garamond", Georgia, serif'
-    lines.slice(0, 5).forEach((line, i) => g.fillText(line, 256, 150 + i * 48))
+    // Shrink the heading only if it would overflow the card.
+    let size = headingSize
+    g.font = `700 ${size}px "Cormorant SC", Georgia, serif`
+    while (g.measureText(heading).width > 476 && size > 28) {
+      size -= 2
+      g.font = `700 ${size}px "Cormorant SC", Georgia, serif`
+    }
+    g.fillText(heading, 256, 72)
+    // Each line shrinks only as much as it needs to stay inside the card.
+    lines.slice(0, 5).forEach((line, i) => {
+      let size = 38
+      g.font = `italic 500 ${size}px "Cormorant Garamond", Georgia, serif`
+      while (g.measureText(line).width > 470 && size > 20) {
+        size -= 1
+        g.font = `italic 500 ${size}px "Cormorant Garamond", Georgia, serif`
+      }
+      g.fillText(line, 256, 150 + i * 48)
+    })
   })
 }
 
@@ -182,9 +199,12 @@ function skills(kit: Kit): Centerpiece {
       // Skill cards standing in the drawer, risen when it's open.
       const cards = new THREE.Group()
       drawer.add(cards)
-      const entries = category.items.length ? category.items : ['To be catalogued']
-      entries.slice(0, 4).forEach((text, i) => {
-        const card = planeWith(cardTexture(category.label, [text]), dw - 0.3, (dw - 0.3) * 0.7)
+      // Index cards of up to four skills each, standing in the drawer.
+      const all = category.items.length ? category.items : ['To be catalogued']
+      const chunks: string[][] = []
+      for (let i = 0; i < all.length; i += 4) chunks.push(all.slice(i, i + 4))
+      chunks.slice(0, 4).forEach((lines, i) => {
+        const card = planeWith(cardTexture(category.label, lines), dw - 0.3, (dw - 0.3) * 0.7)
         card.position.set(0, 0, -0.2 - i * 0.18)
         card.rotation.x = -0.12
         cards.add(card)
@@ -198,6 +218,7 @@ function skills(kit: Kit): Centerpiece {
           view: {
             position: new THREE.Vector3(x * 0.5, y + 1.3, z + 3.3),
             target: new THREE.Vector3(x, y + 0.2, z + 1.1),
+            size: 1.3,
           },
           apply(h, a) {
             drawer.position.z = z + 0.56 + h * 0.08 + a * 0.85
@@ -220,7 +241,8 @@ function projects(kit: Kit): Centerpiece {
   const z = -6
   const items: ExhibitItem[] = []
   const lights: THREE.Light[] = []
-  const spacing = 3.4
+  // Fit any number of cases across the room (inner width about 11 units).
+  const spacing = Math.min(3.4, 10.5 / Math.max(1, projectCases.length))
   projectCases.forEach((p, i) => {
     const x = (i - (projectCases.length - 1) / 2) * spacing
     kit.box(group, 'woodDark', [1.3, 1.5, 1.3], [x, 1.25, z])
@@ -265,6 +287,8 @@ function projects(kit: Kit): Centerpiece {
     lights.push(spot)
 
     const frameBase = new THREE.Color(PALETTE.brass).multiplyScalar(0.2)
+    const glassBase = new THREE.Color(0xcfe6ea)
+    const glassHover = new THREE.Color(ACCENT)
     items.push(
       item({
         id: p.id,
@@ -272,13 +296,17 @@ function projects(kit: Kit): Centerpiece {
         hit: hood,
         view: {
           position: new THREE.Vector3(x, 2.9, z + 2.6),
-          target: new THREE.Vector3(x, 2.2, z),
+          target: new THREE.Vector3(x, 2.35, z),
+          size: 2.6, // plaque to lifted hood
         },
         apply(h, a) {
-          hood.position.y = 2.12 + Math.max(h, a) * 0.22
-          spot.intensity = 30 + Math.max(h, a) * 50
-          glowWith(frame, frameBase, Math.max(h, a), 0.55)
-          glass.opacity = 0.12 - a * 0.06
+          const t = Math.max(h, a)
+          hood.position.y = 2.12 + t * 0.22
+          spot.intensity = 30 + t * 50
+          // Subtle selection: the glass takes a faint cool tint; the brass frame just warms.
+          glowWith(frame, frameBase, t * 0.18, 0.25)
+          glass.color.lerpColors(glassBase, glassHover, t)
+          glass.opacity = 0.12 + t * 0.08 - a * 0.04
         },
       }),
     )
@@ -328,7 +356,7 @@ function about(kit: Kit): Centerpiece {
         id: 'journal',
         label: 'Read the journal',
         hit: journal,
-        view: { position: new THREE.Vector3(0, 3.5, z + 1.7), target: new THREE.Vector3(0, 1.85, z) },
+        view: { position: new THREE.Vector3(0, 3.5, z + 1.7), target: new THREE.Vector3(0, 1.85, z), size: 1.5 },
         apply(h, a) {
           journal.position.y = 1.84 + h * 0.03
           glowWith(ribbon, ribbonBase, Math.max(h, a))
@@ -397,7 +425,7 @@ function resume(kit: Kit): Centerpiece {
         id: 'letter',
         label: 'Break the seal and read the résumé',
         hit: letter,
-        view: { position: new THREE.Vector3(0, 3.5, z + 1.6), target: new THREE.Vector3(0, 2.25, z) },
+        view: { position: new THREE.Vector3(0, 3.5, z + 1.6), target: new THREE.Vector3(0, 2.25, z), size: 1.2 },
         apply(h, a) {
           letter.position.y = 0.06 + h * 0.04 * (1 - a)
           const split = Math.min(1, a * 1.6)
@@ -455,7 +483,7 @@ function cv(kit: Kit): Centerpiece {
         id: 'ledger',
         label: 'Open the ledger',
         hit: book,
-        view: { position: new THREE.Vector3(0, 3.5, z + 1.6), target: new THREE.Vector3(0, 2.25, z) },
+        view: { position: new THREE.Vector3(0, 3.5, z + 1.6), target: new THREE.Vector3(0, 2.25, z), size: 1.4 },
         apply(h, a) {
           book.position.y = 0.08 + h * 0.04
           cover.rotation.z = a * Math.PI * 0.96
@@ -471,46 +499,52 @@ function cv(kit: Kit): Centerpiece {
 function experience(kit: Kit): Centerpiece {
   const group = new THREE.Group()
   const z = -11.4
+  // One frame per entry, newest first, hung in rows of three (reading order).
   const entries = timeline.length
-    ? timeline.map((t) => ({ id: t.id, heading: t.dates || t.title, lines: [t.title, t.org] }))
+    ? timeline.map((t) => ({ id: t.id, heading: t.dates, lines: [t.title, t.org] }))
     : [{ id: 'chronology', heading: 'Chronology', lines: ['Being compiled'] }]
   const items: ExhibitItem[] = []
-  const lights: THREE.Light[] = []
-  // Always hang three frames so the wall reads as a timeline; extras are empty frames.
-  const slots = Math.max(3, entries.length)
-  for (let i = 0; i < slots; i++) {
-    const x = (i - (slots - 1) / 2) * 2.6
-    const e = entries[i - Math.floor((slots - entries.length) / 2)]
+  const cols = Math.min(3, entries.length)
+  const rows = Math.ceil(entries.length / cols)
+  const fw = 1.9
+  const fh = 1.45
+  const gapX = 2.4
+  const gapY = 1.95
+  const top = 3.4 + ((rows - 1) * gapY) / 2
+  entries.forEach((e, i) => {
+    const col = i % cols
+    const row = Math.floor(i / cols)
+    const x = (col - (cols - 1) / 2) * gapX
+    const y = top - row * gapY
     const frame = kit.material('brass', {}, true)
     const g = new THREE.Group()
-    g.position.set(x, 3.6, z)
+    g.position.set(x, y, z)
     group.add(g)
-    kit.box(g, frame, [1.9, 1.5, 0.1], [0, 0, 0])
-    const art = planeWith(e ? cardTexture(e.heading, e.lines) : cardTexture('', []), 1.6, 1.2)
+    kit.box(g, frame, [fw, fh, 0.1], [0, 0, 0])
+    // Dates as large as fit, so the chronology reads from across the room.
+    const art = planeWith(cardTexture(e.heading, e.lines, 76), fw - 0.25, fh - 0.25)
     art.position.z = 0.06
     g.add(art)
-    const lamp = kit.box(group, 'brass', [1.0, 0.08, 0.16], [x, 4.55, z + 0.25])
-    void lamp
-    if (!e) continue
     const base = new THREE.Color(PALETTE.brass).multiplyScalar(0.2)
     items.push(
       item({
         id: e.id,
-        label: `Examine: ${e.heading}`,
+        label: `Examine: ${e.lines[0]}`,
         hit: g,
-        view: { position: new THREE.Vector3(x, 3.6, z + 3), target: new THREE.Vector3(x, 3.6, z) },
+        view: { position: new THREE.Vector3(x, y, z + 3), target: new THREE.Vector3(x, y, z), size: 2.1 },
         apply(h, a) {
           g.position.z = z + h * 0.06
           glowWith(frame, base, Math.max(h, a) * (1 - a * 0.5), 0.45)
         },
       }),
     )
-  }
-  const wash = new THREE.PointLight(PALETTE.candle, 8, 8, 1.6)
-  wash.position.set(0, 5.5, z + 2.5)
+  })
+  // A brass picture rail above the top row.
+  kit.box(group, 'brass', [cols * gapX + 0.6, 0.08, 0.16], [0, top + fh / 2 + 0.35, z + 0.25])
+  const wash = new THREE.PointLight(PALETTE.candle, 10, 9, 1.6)
+  wash.position.set(0, top + 2, z + 2.5)
   group.add(wash)
-  lights.push(wash)
-  return { group, items, focus: new THREE.Vector3(0, 3.4, z), lights }
+  return { group, items, focus: new THREE.Vector3(0, 3.4, z), lights: [wash] }
 }
 
 const BUILDERS: Record<ExhibitId, (kit: Kit) => Centerpiece> = {

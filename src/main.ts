@@ -2,9 +2,10 @@ import './styles/tokens.css'
 import './styles/base.css'
 import './styles/scenes.css'
 import './styles/exhibit.css'
+import './styles/hud.css'
 
 import { exhibits, findExhibit } from './data/exhibits.ts'
-import { site } from './data/site.ts'
+import { contactLabel, openEmail, site, socialLinks } from './data/site.ts'
 import { renderGrounds, mountGrounds, type SceneController } from './components/grounds.ts'
 import { renderLobby, mountLobby } from './components/lobby.ts'
 import { mountExhibit, renderExhibit, renderNotFound } from './components/exhibit.ts'
@@ -56,7 +57,7 @@ function render(route: Route): void {
 
   if (route.view === 'grounds') {
     main.innerHTML = renderGrounds()
-    document.title = `${site.museumName} · ${site.tagline}`
+    document.title = `${site.ownerName} · ${site.positioning}`
     const root = main.querySelector<HTMLElement>('[data-scene]')!
     void mountGrounds(root, {
       reducedMotion: REDUCED_MOTION.matches,
@@ -104,7 +105,14 @@ function renderMap(): void {
     { href: '#/lobby', label: 'Library Lobby' },
     ...exhibits.map((e) => ({ href: `#/${e.id}`, label: `${e.number}. ${e.title}` })),
   ]
-  mapList.innerHTML = items.map((i) => `<li><a href="${esc(i.href)}">${esc(i.label)}</a></li>`).join('')
+  const exhibitItems = items.map((i) => `<li><a href="${esc(i.href)}">${esc(i.label)}</a></li>`).join('')
+  // Elsewhere: profiles, and the email link (address assembled only on click).
+  const elsewhere = socialLinks
+    .filter((l) => l.href)
+    .map((l) => `<li><a href="${esc(l.href)}" target="_blank" rel="noopener noreferrer">${esc(l.label)}<span class="visually-hidden"> (opens in a new tab)</span></a></li>`)
+    .join('')
+  mapList.innerHTML = `${exhibitItems}<li class="map__rule" aria-hidden="true"></li>${elsewhere}<li><button type="button" class="map__email" data-email>${esc(contactLabel)}</button></li>`
+  mapList.querySelector('[data-email]')!.addEventListener('click', openEmail)
 }
 
 function updateMap(route: Route): void {

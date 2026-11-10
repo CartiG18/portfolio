@@ -1,7 +1,9 @@
-/* Full-screen 3D views (grounds + library). */
+/* Full-screen 3D views and the layout/visibility mechanics of their overlays.
+   The overlays' look (frames, type, colour) lives in hud.css. */
 
 body[data-view='grounds'],
-body[data-view='lobby'] {
+body[data-view='lobby'],
+body[data-view='room'] {
   overflow: hidden;
   background: #05070d;
 }
@@ -16,7 +18,8 @@ body[data-view='lobby'] {
   background: radial-gradient(ellipse 60% 50% at 50% 55%, #142338, #05070d 70%);
 }
 
-.lobby {
+.lobby,
+.exhibit-room {
   background: radial-gradient(ellipse 60% 50% at 50% 55%, #2a160c, #080504 70%);
 }
 
@@ -56,164 +59,23 @@ body[data-view='lobby'] {
   }
 }
 
-/* Keyboard / screen-reader door list: hidden until focused, always shown without WebGL. */
+/* ---------- Hidden-until-focused keyboard lists (shown without WebGL) ---------- */
+
 .lobby-directory {
   position: absolute;
   left: clamp(16px, 3vw, 32px);
   bottom: clamp(16px, 3vh, 32px);
   z-index: 5;
-  padding: 8px;
-  background: rgb(10 7 4 / 0.85);
-  border: 1px solid rgb(255 206 102 / 0.75);
-  box-shadow: 0 0 10px rgb(255 206 102 / 0.3);
 }
 
-.lobby-directory:not(:focus-within) {
-  position: absolute !important;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  overflow: hidden;
-  clip-path: inset(50%);
-  border: 0;
-}
-
-.no-webgl .lobby-directory {
-  position: absolute !important;
-  width: auto;
-  height: auto;
-  padding: 8px;
-  overflow: visible;
-  clip-path: none;
-  border: 1px solid rgb(255 206 102 / 0.75);
-}
-
-.lobby-directory ul {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.lobby-directory a {
-  display: block;
-  padding: 0.4rem 0.7rem;
-  font-size: 0.9rem;
-  color: #efe0bd;
-  text-decoration: none;
-}
-
-.lobby-directory a:hover,
-.lobby-directory a:focus-visible {
-  background: rgb(143 211 223 / 0.1);
-  color: var(--accent);
-}
-
-/* ---------- Exhibit rooms ---------- */
-
-body[data-view='room'] {
-  overflow: hidden;
-  background: #080504;
-}
-
-body[data-view='room'] .brand {
-  visibility: hidden;
-}
-
-.exhibit-room {
-  background: radial-gradient(ellipse 60% 50% at 50% 55%, #2a160c, #080504 70%);
-}
-
-/* Shared thin glowing bezel (matches the Portfolio button). */
-.bezel {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5em;
-  padding: 0.55em 1em;
-  font-family: var(--font-ui);
-  font-size: 11px;
-  font-weight: 600;
-  line-height: 1;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  color: #ffe9b0;
-  text-decoration: none;
-  background: rgb(10 7 4 / 0.35);
-  border: 1px solid rgb(255 206 102 / 0.85);
-  border-radius: 0;
-  cursor: pointer;
-  box-shadow:
-    0 0 6px rgb(255 206 102 / 0.45),
-    inset 0 0 6px rgb(255 206 102 / 0.18);
-  transition:
-    color 200ms ease,
-    border-color 200ms ease,
-    box-shadow 200ms ease;
-}
-
-.bezel:hover,
-.bezel:focus-visible {
-  color: var(--accent);
-  border-color: var(--accent);
-  box-shadow:
-    0 0 8px rgb(143 211 223 / 0.6),
-    inset 0 0 6px rgb(143 211 223 / 0.2);
-}
-
-.room-placard {
-  position: absolute;
-  top: 18px;
-  left: clamp(16px, 3vw, 32px);
-  z-index: 5;
-  max-width: min(60vw, 28rem);
-  pointer-events: none;
-  text-shadow: 0 2px 12px rgb(0 0 0 / 0.9);
-}
-
-.room-placard__kicker {
-  margin: 0;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.3em;
-  text-transform: uppercase;
-  color: #d9c7a6;
-}
-
-.room-placard__title {
-  margin: 0.15em 0 0;
-  font-family: var(--font-display);
-  font-size: clamp(1.6rem, 1.2rem + 1.4vw, 2.4rem);
-  font-weight: 700;
-  line-height: 1;
-  letter-spacing: 0.03em;
-  color: #e9cf8a;
-}
-
-.room-placard__subtitle {
-  margin: 0.2em 0 0;
-  font-family: var(--font-serif);
-  font-style: italic;
-  font-size: var(--step-1);
-  color: #d9c7a6;
-}
-
-.room-back {
-  position: absolute;
-  left: clamp(16px, 3vw, 32px);
-  bottom: clamp(16px, 3vh, 32px);
-  z-index: 6;
-}
-
-/* Keyboard equivalents of the 3D items: hidden until focused, always shown without WebGL. */
 .room-items {
   position: absolute;
   left: clamp(16px, 3vw, 32px);
-  bottom: calc(clamp(16px, 3vh, 32px) + 48px);
+  bottom: calc(clamp(16px, 3vh, 32px) + 56px);
   z-index: 6;
-  padding: 6px;
-  background: rgb(10 7 4 / 0.85);
-  border: 1px solid rgb(255 206 102 / 0.6);
 }
 
+.lobby-directory:not(:focus-within),
 .room-items:not(:focus-within) {
   width: 1px;
   height: 1px;
@@ -223,59 +85,49 @@ body[data-view='room'] .brand {
   border: 0;
 }
 
+.no-webgl .lobby-directory,
 .no-webgl .room-items {
   width: auto;
   height: auto;
-  padding: 6px;
   overflow: visible;
   clip-path: none;
-  border: 1px solid rgb(255 206 102 / 0.6);
 }
 
-.room-items ul {
-  margin: 0;
-  padding: 0;
-  list-style: none;
+.no-webgl .lobby-directory {
+  position: relative;
+  left: auto;
+  bottom: auto;
+  max-width: 24rem;
+  margin: 120px auto 48px;
 }
 
-.room-items button {
-  display: block;
-  width: 100%;
-  padding: 0.45rem 0.8rem;
-  font: inherit;
-  font-size: 0.9rem;
-  text-align: left;
-  color: #efe0bd;
-  background: none;
-  border: 0;
-  cursor: pointer;
+/* ---------- Room overlays: placement ---------- */
+
+.room-placard {
+  position: absolute;
+  top: 18px;
+  left: clamp(16px, 3vw, 32px);
+  z-index: 5;
+  max-width: min(60vw, 26rem);
+  pointer-events: none;
 }
 
-.room-items button:hover,
-.room-items button:focus-visible,
-.room-items button[aria-expanded='true'] {
-  color: var(--accent);
-  background: rgb(143 211 223 / 0.1);
+.room-back {
+  position: absolute;
+  left: clamp(16px, 3vw, 32px);
+  bottom: clamp(16px, 3vh, 32px);
+  z-index: 6;
 }
 
-/* Content panel: a parchment card. All entries stay in the DOM; closed = visually hidden. */
+/* Content panel: all entries stay in the DOM; closed = visually hidden (and inert). */
 .exhibit-panel {
   position: absolute;
   right: clamp(16px, 3vw, 40px);
   top: 50%;
   z-index: 7;
-  width: min(30rem, calc(100vw - 32px));
-  max-height: min(70vh, 40rem);
+  width: min(31rem, calc(100vw - 32px));
+  max-height: min(72vh, 42rem);
   overflow: auto;
-  padding: 2.4rem 2rem 2rem;
-  color: var(--ink);
-  background: var(--parchment);
-  border: 1px solid #9a7a3e;
-  box-shadow:
-    inset 0 0 50px rgb(120 90 40 / 0.25),
-    0 0 0 6px rgb(30 15 8 / 0.85),
-    0 0 0 7px rgb(176 141 74 / 0.8),
-    0 30px 60px rgb(0 0 0 / 0.6);
   transform: translateY(-50%);
   transition:
     opacity 450ms ease,
@@ -303,8 +155,7 @@ body[data-view='room'] .brand {
   width: min(40rem, calc(100vw - 32px));
   height: auto;
   max-height: none;
-  margin: 160px auto 96px;
-  padding: 2rem;
+  margin: 200px auto 96px;
   overflow: visible;
   clip-path: none;
   opacity: 1;
@@ -315,152 +166,51 @@ body[data-view='room'] .brand {
   display: block !important;
 }
 
-.no-webgl .panel-close {
+.no-webgl .panel-close,
+.no-webgl .scene-hint {
   display: none;
 }
 
-.panel-close {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  color: var(--ink);
-  background: transparent;
-  border-color: rgb(120 80 30 / 0.6);
-  box-shadow: none;
+/* Narrow screens: the panel docks to the bottom and the camera frames the object above it. */
+@media (max-width: 699px) {
+  .exhibit-panel {
+    left: 0;
+    right: 0;
+    top: auto;
+    bottom: 0;
+    width: auto;
+    max-height: 50vh;
+    transform: none;
+  }
 }
 
-.panel-entry {
-  outline: none;
-}
+/* ---------- Book notes and hints: placement ---------- */
 
-.panel-entry + .panel-entry {
-  margin-top: 1.5rem;
-}
-
-.panel-entry__title {
-  margin: 0 0 0.75rem;
-  font-family: var(--font-display);
-  font-size: var(--step-2);
-  font-weight: 700;
-  line-height: 1.1;
-  color: #4a1418;
-}
-
-.panel-entry p {
-  margin: 0 0 0.75rem;
-}
-
-.panel-meta {
-  font-size: var(--step--1);
-  letter-spacing: 0.04em;
-  color: var(--ink-soft);
-}
-
-.panel-link {
-  color: #4a1418;
-  font-weight: 600;
-}
-
-.panel-link:hover,
-.panel-link:focus-visible {
-  color: #1f6f7d;
-}
-
-.card-list {
-  margin: 0;
-  padding-left: 1.1rem;
-}
-
-.exhibit-panel .notice {
-  padding: 0;
-  text-align: left;
-  background: none;
-  box-shadow: none;
-}
-
-.exhibit-panel .notice__title {
-  font-size: var(--step-1);
-  color: var(--ink-soft);
-}
-
-/* A note found tucked inside a shelf book. */
 .book-note {
   position: fixed;
   left: 0;
   top: 0;
   z-index: 8;
-  width: min(280px, calc(100vw - 32px));
-  padding: 1rem 1.1rem 0.9rem;
-  color: var(--ink);
-  background: var(--parchment);
-  border: 1px solid #9a7a3e;
-  box-shadow:
-    inset 0 0 30px rgb(120 90 40 / 0.25),
-    0 0 0 1px var(--accent),
-    0 16px 36px rgb(0 0 0 / 0.55);
+  width: min(300px, calc(100vw - 32px));
   pointer-events: none;
   animation: arrive 300ms var(--ease-out);
 }
 
-.book-note__text {
-  margin: 0 0 0.4rem;
-  font-family: var(--font-serif);
-  font-style: italic;
-  font-size: var(--step-1);
-  line-height: 1.3;
-}
-
-.book-note__source {
-  margin: 0;
-  font-size: var(--step--1);
-  color: var(--ink-soft);
-}
-
-.lobby-directory__book {
-  display: block;
-  width: 100%;
-  padding: 0.4rem 0.7rem;
-  font: inherit;
-  font-size: 0.9rem;
-  text-align: left;
-  color: #efe0bd;
-  background: none;
-  border: 0;
-  cursor: pointer;
-}
-
-.lobby-directory__book:hover,
-.lobby-directory__book:focus-visible {
-  color: var(--accent);
-  background: rgb(143 211 223 / 0.1);
-}
-
-/* Minimal wayfinding hint; fades after the first interaction. */
 .scene-hint {
   position: absolute;
   left: 50%;
   bottom: clamp(20px, 5vh, 44px);
   z-index: 4;
   margin: 0;
-  padding: 0.5em 1.1em;
-  font-family: var(--font-display);
-  font-size: var(--step-0);
-  font-weight: 600;
-  letter-spacing: 0.14em;
-  color: #efe0bd;
-  text-shadow: 0 1px 10px rgb(0 0 0 / 0.9);
   transform: translateX(-50%);
   pointer-events: none;
   animation: hint-in 1200ms 900ms var(--ease-out) both;
-  transition: opacity 900ms ease;
+  transition: opacity 600ms ease;
 }
 
-.scene-hint.is-faded {
+.scene-hint.is-faded,
+.scene-hint.is-hidden {
   opacity: 0;
-}
-
-.no-webgl .scene-hint {
-  display: none;
 }
 
 @keyframes hint-in {

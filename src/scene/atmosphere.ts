@@ -153,3 +153,108 @@ export function createGroundFog(rand: () => number): FogLayers {
     },
   }
 }
+
+// ---------- Light shafts (cheap fake volumetrics) ----------
+
+export type ShaftMaterial = THREE.ShaderMaterial & {
+  uniforms: { uColor: THREE.IUniform<THREE.Color>; uOpacity: THREE.IUniform<number>; uTime: THREE.IUniform<number>; uPhase: THREE.IUniform<number> }
+}
+
+/**
+ * Additive material for a light shaft: brightest at the source end, fading along its length
+ * and toward its silhouette, with a slow shimmer. One material per shaft so each can drift.
+ */
+export function createShaftMaterial(color: number, phase = 0): ShaftMaterial {
+  return new THREE.ShaderMaterial({
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    side: THREE.DoubleSide,
+    fog: false,
+    uniforms: {
+      uColor: { value: new THREE.Color(color) },
+      uOpacity: { value: 0 },
+      uTime: { value: 0 },
+      uPhase: { value: phase },
+    },
+    vertexShader: /* glsl */ `
+      varying float vAlong;
+      varying float vFacing;
+      void main() {
+        vAlong = uv.y;
+        vec3 n = normalize(normalMatrix * normal);
+        vec4 mv = modelViewMatrix * vec4(position, 1.0);
+        vFacing = abs(dot(n, normalize(-mv.xyz)));
+        gl_Position = projectionMatrix * mv;
+      }
+    `,
+    fragmentShader: /* glsl */ `
+      uniform vec3 uColor;
+      uniform float uOpacity;
+      uniform float uTime;
+      uniform float uPhase;
+      varying float vAlong;
+      varying float vFacing;
+      void main() {
+        float shimmer = 0.85 + 0.15 * sin(uTime * 0.6 + uPhase * 6.2831);
+        // uv.y = 1 at the source (cylinder top), fading out toward the far end.
+        float a = uOpacity * shimmer * smoothstep(0.0, 0.55, vAlong) * pow(vFacing, 1.6);
+        // Additive blending already scales by alpha, so carry the strength in rgb only.
+        gl_FragColor = vec4(uColor * a, 1.0);
+      }
+    `,
+  }) as ShaftMaterial
+}
+
+/** A tapered open cylinder from `source` to `end`, oriented along the beam. */
+export function createShaft(source: THREE.Vector3, end: THREE.Vector3, r0: number, r1: number, material: THREE.Material): THREE.Mesh {
+  const dir = end.clone().sub(source)
+  const length = dir.length()
+  // CylinderGeometry runs along +Y with uv.y = 1 at the top; put the top at the source.
+  const mesh = new THREE.Mesh(new THREE.CylinderGeometry(r0, r1, length, 20, 1, true), material)
+  mesh.position.copy(source).addScaledVector(dir, 0.5)
+  mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize().negate())
+  mesh.renderOrder = 3
+  return mesh
+}
+
+// ---------- Sky dome ----------
+
+export type SkyDome = THREE.Mesh<THREE.SphereGeometry, THREE.ShaderMaterial>
+
+/** Gradient sky: night navy, or a clear blue zenith over an amber horizon (blend 0 → 1). */
+export function createSkyDome(night: number): SkyDome {
+  return new THREE.Mesh(
+    new THREE.SphereGeometry(350, 32, 16),
+    new THREE.ShaderMaterial({
+      side: THREE.BackSide,
+      depthWrite: false,
+      fog: false,
+      uniforms: {
+        uBlend: { value: 0 },
+        uNight: { value: new THREE.Color(night) },
+        uDayTop: { value: new THREE.Color(0x5d8fcf) },
+        uDayHorizon: { value: new THREE.Color(0xf2b47a) },
+      },
+      vertexShader: /* glsl */ `
+        varying vec3 vDir;
+        void main() {
+          vDir = normalize(position);
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: /* glsl */ `
+        uniform float uBlend;
+        uniform vec3 uNight;
+        uniform vec3 uDayTop;
+        uniform vec3 uDayHorizon;
+        varying vec3 vDir;
+        void main() {
+          float h = clamp(vDir.y, 0.0, 1.0);
+          vec3 day = mix(uDayHorizon, uDayTop, smoothstep(0.02, 0.55, h));
+          gl_FragColor = vec4(mix(uNight, day, uBlend), 1.0);
+        }
+      `,
+    }),
+  )
+}

@@ -63,6 +63,28 @@ class Ambience {
     src.start(t, Math.random(), 0.5)
   }
 
+  /** A soft two-note clock chime. */
+  chime(): void {
+    if (!this.ready()) return
+    const ctx = this.ctx!
+    const t0 = ctx.currentTime + 0.02
+    for (const [freq, at] of [[659.25, 0], [493.88, 0.45]] as const) {
+      for (const [mult, level] of [[1, 0.09], [2.76, 0.025], [5.4, 0.01]] as const) {
+        const osc = ctx.createOscillator()
+        osc.type = 'sine'
+        osc.frequency.value = freq * mult
+        const env = ctx.createGain()
+        const t = t0 + at
+        env.gain.setValueAtTime(0, t)
+        env.gain.linearRampToValueAtTime(level, t + 0.01)
+        env.gain.exponentialRampToValueAtTime(0.0005, t + 2.2)
+        osc.connect(env).connect(this.master!)
+        osc.start(t)
+        osc.stop(t + 2.3)
+      }
+    }
+  }
+
   private ready(): boolean {
     return this.enabled && this.ctx !== null && this.ctx.state === 'running'
   }

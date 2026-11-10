@@ -37,10 +37,11 @@
   /* Type */
   --font-display: 'Cormorant SC', 'Cormorant Garamond', Georgia, serif;
   --font-serif: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
-  --font-ui: 'Source Sans 3', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  /* One family throughout (matches the 3D plaques): no separate UI sans. */
+  --font-ui: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
 
   --step--1: clamp(0.85rem, 0.82rem + 0.15vw, 0.95rem);
-  --step-0: clamp(1rem, 0.96rem + 0.2vw, 1.125rem);
+  --step-0: clamp(1.125rem, 1.08rem + 0.2vw, 1.25rem); /* Cormorant is light: 18px minimum body */
   --step-1: clamp(1.25rem, 1.15rem + 0.5vw, 1.5rem);
   --step-2: clamp(1.6rem, 1.4rem + 1vw, 2.25rem);
   --step-3: clamp(2.2rem, 1.8rem + 2vw, 3.5rem);

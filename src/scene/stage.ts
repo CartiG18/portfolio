@@ -34,6 +34,11 @@ export interface StageOptions {
     /** Distance at a 16:10 landscape aspect; pulled back automatically on narrow screens. */
     distance?: number
     position?: THREE.Vector3
+    /**
+     * Eye-level views: the aspect at which `fov` applies. Narrower screens widen the vertical
+     * FOV to keep this horizontal field of view, so the same things stay in frame.
+     */
+    refAspect?: number
   }
   /** Cursor response: drift the camera sideways (sky views)... */
   parallax?: { x: number; y: number; look: number }
@@ -75,6 +80,7 @@ export class Stage {
   private renderer: THREE.WebGLRenderer
   private composer: EffectComposer
   private bokeh: BokehPass | null = null
+  private bloom: UnrealBloomPass
   private grade: ReturnType<typeof createGradePass> | null = null
   private focusTarget: THREE.Vector3 | null = null
   private focusAmount = 0
@@ -124,7 +130,8 @@ export class Stage {
       this.composer.addPass(this.bokeh)
     }
     const { strength, radius, threshold } = opts.bloom
-    this.composer.addPass(new UnrealBloomPass(new THREE.Vector2(1, 1), strength, radius, threshold))
+    this.bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), strength, radius, threshold)
+    this.composer.addPass(this.bloom)
     this.composer.addPass(new OutputPass())
     if (opts.grade) {
       this.grade = createGradePass(opts.grade)
@@ -168,6 +175,34 @@ export class Stage {
   /** Current look target, e.g. to start a flight from where the camera is pointing. */
   get currentLookAt(): THREE.Vector3 {
     return this.lookAt.clone()
+  }
+
+  /** Adjust the global look (used for the day/night crossfade). */
+  setLook(look: {
+    exposure?: number
+    bloomStrength?: number
+    bloomThreshold?: number
+    background?: THREE.Color
+    fogColor?: THREE.Color
+    fogNear?: number
+    fogFar?: number
+    vignette?: number
+    warmth?: number
+    rays?: number
+  }): void {
+    if (look.exposure !== undefined) this.renderer.toneMappingExposure = look.exposure
+    if (look.bloomStrength !== undefined) this.bloom.strength = look.bloomStrength
+    if (look.bloomThreshold !== undefined) this.bloom.threshold = look.bloomThreshold
+    if (look.background) (this.scene.background as THREE.Color).copy(look.background)
+    const fog = this.scene.fog as THREE.Fog
+    if (look.fogColor) fog.color.copy(look.fogColor)
+    if (look.fogNear !== undefined) fog.near = look.fogNear
+    if (look.fogFar !== undefined) fog.far = look.fogFar
+    if (this.grade) {
+      if (look.vignette !== undefined) this.grade.uniforms.uVignette.value = look.vignette
+      if (look.warmth !== undefined) this.grade.uniforms.uWarmth.value = look.warmth
+      if (look.rays !== undefined) this.grade.uniforms.uRays.value = look.rays
+    }
   }
 
   /** Bring a point into sharp focus with depth of field (null to clear). */
@@ -250,6 +285,7 @@ export class Stage {
     this.renderer.setSize(w, h, false)
     this.composer.setSize(w, h)
     this.camera.aspect = w / h
+    if (this.grade) this.grade.uniforms.uAspect.value = this.camera.aspect
     this.camera.fov = this.fovFor(this.camera.aspect)
     this.camera.updateProjectionMatrix()
     this.placeBaseCamera()
@@ -259,9 +295,11 @@ export class Stage {
   private fovFor(aspect: number): number {
     const c = this.opts.camera
     if (!c.position) return c.fov
-    const hHalf = Math.atan(Math.tan(THREE.MathUtils.degToRad(c.fov) / 2) * 1.6)
+    const hHalf = Math.atan(Math.tan(THREE.MathUtils.degToRad(c.fov) / 2) * (c.refAspect ?? 1.6))
+    // Hold the horizontal field of view at every aspect: narrow screens widen vertically, and
+    // short-wide screens narrow vertically so placards don't shrink. Clamped to stay natural.
     const vFov = THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(hHalf) / aspect))
-    return Math.min(85, Math.max(c.fov, vFov))
+    return Math.min(85, Math.max(36, vFov))
   }
 
   private placeBaseCamera(): void {
@@ -356,7 +394,12 @@ export class Stage {
   }
 
   private updatePost(time: number, dt: number): void {
-    if (this.grade) this.grade.uniforms.uTime.value = time
+    if (this.grade) {
+      const u = this.grade.uniforms
+      u.uTime.value = time
+      // Skip the full-screen pass entirely when it would be a no-op (e.g. the exterior at night).
+      this.grade.enabled = u.uVignette.value > 0.001 || u.uGrain.value > 0.001 || u.uWarmth.value > 0.001 || u.uRays.value > 0.001
+    }
     if (!this.bokeh) return
     const want = this.focusTarget && !this.opts.reducedMotion ? 1 : 0
     this.focusAmount += (want - this.focusAmount) * Math.min(1, dt * 3)
@@ -395,7 +438,16 @@ export class Stage {
     this.updatePointer(e)
     this.pointerInside = true
     this.pointerDirty = true
-    if (this.finePointer && !this.opts.reducedMotion) this.parallaxTarget.copy(this.pointer)
+    if (this.finePointer && !this.opts.reducedMotion) {
+      if (this.opts.lookAround) {
+        // Eye-level views: no head turn while the cursor is in the middle half of the screen,
+        // easing in only toward the edges, so targets don't slide away from the cursor.
+        const ease = (v: number, dead: number) => Math.sign(v) * THREE.MathUtils.smoothstep(Math.abs(v), dead, 1)
+        this.parallaxTarget.set(ease(this.pointer.x, 0.5), ease(this.pointer.y, 0.4))
+      } else {
+        this.parallaxTarget.copy(this.pointer)
+      }
+    }
   }
 
   private onPointerLeave = (): void => {

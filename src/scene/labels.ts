@@ -46,7 +46,7 @@ export function placardTexture(kicker: string, title: string): THREE.CanvasTextu
 
   g.textAlign = 'center'
   g.fillStyle = '#3a2610'
-  g.font = '600 38px "Source Sans 3", system-ui, sans-serif'
+  g.font = '700 40px "Cormorant SC", Georgia, serif'
   g.letterSpacing = '10px'
   g.fillText(kicker.toUpperCase(), w / 2, 100)
   g.letterSpacing = '2px'
@@ -65,7 +65,7 @@ export function placardTexture(kicker: string, title: string): THREE.CanvasTextu
 }
 
 /** A framed portrait: an icon on dark velvet, with a small caption. */
-export function portraitTexture(iconPath: string, caption: string): THREE.CanvasTexture {
+export function portraitTexture(iconPath: string, caption: string, fillRule: CanvasFillRule = 'nonzero'): THREE.CanvasTexture {
   const w = 512
   const h = 640
   const c = document.createElement('canvas')
@@ -82,7 +82,7 @@ export function portraitTexture(iconPath: string, caption: string): THREE.Canvas
   g.translate(w / 2 - 150, h * 0.42 - 150)
   g.scale(300 / 24, 300 / 24)
   g.fillStyle = '#e8c872'
-  g.fill(new Path2D(iconPath))
+  g.fill(new Path2D(iconPath), fillRule)
   g.restore()
 
   g.textAlign = 'center'

@@ -1,0 +1,478 @@
+/*
+ * "Engraved brass" HUD: every HTML overlay on every route shares these tokens and parts.
+ *  - Frames: hairline double brass rules (1px, ~3px gap, 1px), small engraved corners,
+ *    square corners, near-black ink backing with a faint grain. No glows, no blur.
+ *  - Type: Cormorant SC for labels/buttons (letterspaced), Cormorant Garamond 500+ for body.
+ *  - Hover/focus warms the brass and draws a thin rule out from the centre.
+ *  - The cool ACCENT stays on 3D objects; the HUD's focus ring is a brass double outline.
+ */
+
+:root {
+  --hud-ink: rgb(13 9 6 / 0.88);
+  --hud-ink-solid: #0d0906;
+  --hud-brass: #b8935a;
+  --hud-brass-hi: #e6c88c;
+  --hud-parchment: #efe3c4;
+  --hud-text: #efe3c4;
+  --hud-ink-text: #24170c;
+  --hud-ink-soft: #4b3722;
+  --hud-oxblood: #6a1c20;
+
+  --hud-label: 700 15px/1.2 var(--font-display);
+  --hud-label-spacing: 0.2em;
+
+  /* Faint paper/ink grain (inline SVG noise). */
+  --hud-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.5 0 0 0 0 0.45 0 0 0 0 0.4 0 0 0 0.07 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+
+  /* Engraved corner flourish (top-left; rotated copies for the other corners). */
+  --hud-corner-tl: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%23e6c88c' stroke-width='1'%3E%3Cpath d='M.5 11.5V.5h11M3.5 8.5V3.5h5'/%3E%3Ccircle cx='3.5' cy='3.5' r='.9' fill='%23e6c88c' stroke='none'/%3E%3C/svg%3E");
+  --hud-corner-tr: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%23e6c88c' stroke-width='1'%3E%3Cpath d='M11.5 11.5V.5H.5M8.5 8.5V3.5h-5'/%3E%3Ccircle cx='8.5' cy='3.5' r='.9' fill='%23e6c88c' stroke='none'/%3E%3C/svg%3E");
+  --hud-corner-bl: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%23e6c88c' stroke-width='1'%3E%3Cpath d='M.5 .5v11h11M3.5 3.5v5h5'/%3E%3Ccircle cx='3.5' cy='8.5' r='.9' fill='%23e6c88c' stroke='none'/%3E%3C/svg%3E");
+  --hud-corner-br: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%23e6c88c' stroke-width='1'%3E%3Cpath d='M11.5 .5v11H.5M8.5 3.5v5h-5'/%3E%3Ccircle cx='8.5' cy='8.5' r='.9' fill='%23e6c88c' stroke='none'/%3E%3C/svg%3E");
+  --hud-corners: var(--hud-corner-tl) top 3px left 3px / 12px no-repeat, var(--hud-corner-tr) top 3px right 3px / 12px no-repeat,
+    var(--hud-corner-bl) bottom 3px left 3px / 12px no-repeat, var(--hud-corner-br) bottom 3px right 3px / 12px no-repeat;
+}
+
+/* ---------- Focus: a clear brass double outline ---------- */
+
+:focus-visible {
+  outline: 3px double var(--hud-brass-hi);
+  outline-offset: 3px;
+}
+
+/* ---------- Frames ---------- */
+
+/* Ink frame with a double hairline rule. */
+.map summary,
+.map ol,
+.sound-toggle,
+.room-placard,
+.room-back,
+.room-items,
+.lobby-directory,
+.scene-hint,
+.skip-link,
+.back-link,
+.brand {
+  background: var(--hud-grain), var(--hud-ink);
+  border: 1px solid var(--hud-brass);
+  border-radius: 0;
+  box-shadow:
+    inset 0 0 0 3px var(--hud-ink-solid),
+    inset 0 0 0 4px rgb(184 147 90 / 0.65);
+}
+
+/* Cards also carry engraved corners. */
+.map ol,
+.room-placard,
+.room-items,
+.lobby-directory {
+  background: var(--hud-corners), var(--hud-grain), var(--hud-ink);
+}
+
+/* ---------- Labels and buttons ---------- */
+
+.map summary,
+.sound-toggle,
+.room-back,
+.skip-link,
+.back-link,
+.brand,
+.map a,
+.map__email,
+.room-items button,
+.lobby-directory a,
+.lobby-directory__book,
+.panel-close {
+  font: var(--hud-label);
+  letter-spacing: var(--hud-label-spacing);
+  color: var(--hud-brass-hi);
+  text-decoration: none;
+  cursor: pointer;
+  white-space: nowrap;
+  /* Thin rule drawn out from the centre on hover/focus. */
+  background-image: linear-gradient(currentColor, currentColor);
+  background-repeat: no-repeat;
+  background-position: center calc(100% - 7px);
+  background-size: 0% 1px;
+  transition:
+    background-size 200ms ease,
+    color 200ms ease;
+}
+
+/* Framed controls keep the grain/ink layers under the underline. */
+.map summary,
+.sound-toggle,
+.room-back,
+.skip-link,
+.back-link,
+.brand {
+  background:
+    linear-gradient(currentColor, currentColor) center calc(100% - 7px) / 0% 1px no-repeat,
+    var(--hud-grain),
+    var(--hud-ink);
+  padding: 0.65em 1.15em 0.7em;
+}
+
+.map summary:hover,
+.map summary:focus-visible,
+.map[open] summary,
+.sound-toggle:hover,
+.sound-toggle:focus-visible,
+.room-back:hover,
+.room-back:focus-visible,
+.skip-link:focus,
+.back-link:hover,
+.back-link:focus-visible,
+.brand:hover,
+.brand:focus-visible,
+.map a:hover,
+.map a:focus-visible,
+.map__email:hover,
+.map__email:focus-visible,
+.room-items button:hover,
+.room-items button:focus-visible,
+.room-items button[aria-expanded='true'],
+.lobby-directory a:hover,
+.lobby-directory a:focus-visible,
+.lobby-directory__book:hover,
+.lobby-directory__book:focus-visible,
+.panel-close:hover,
+.panel-close:focus-visible {
+  color: #f6dfab;
+  background-size: 62% 1px;
+}
+
+.map summary:hover,
+.map summary:focus-visible,
+.map[open] summary,
+.sound-toggle:hover,
+.sound-toggle:focus-visible,
+.room-back:hover,
+.room-back:focus-visible,
+.skip-link:focus,
+.back-link:hover,
+.back-link:focus-visible,
+.brand:hover,
+.brand:focus-visible {
+  background:
+    linear-gradient(currentColor, currentColor) center calc(100% - 7px) / 62% 1px no-repeat,
+    var(--hud-grain),
+    var(--hud-ink);
+  border-color: var(--hud-brass-hi);
+}
+
+.sound-toggle[aria-pressed='true'] {
+  color: #f6dfab;
+}
+
+/* ---------- Site header: Portfolio menu, Sound, brand ---------- */
+
+.map summary {
+  list-style: none;
+}
+
+.map summary::-webkit-details-marker {
+  display: none;
+}
+
+.brand {
+  display: inline-block;
+}
+
+/* Narrow engraved card listing the exhibits by numeral. */
+.map ol {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  width: 21rem; /* wide enough for "IV. Experience & Education" on one line */
+  max-width: calc(100vw - 32px);
+  margin: 0;
+  padding: 14px 10px;
+  list-style: none;
+}
+
+.map a,
+.map__email {
+  display: block;
+  width: 100%;
+  white-space: normal;
+  padding: 0.55rem 0.75rem 0.6rem 1.75rem;
+  text-align: left;
+  border: 0;
+  background-color: transparent;
+  position: relative;
+}
+
+/* Current page: a small brass diamond, not a colour change. */
+.map a[aria-current='page']::before {
+  content: '';
+  position: absolute;
+  left: 0.7rem;
+  top: 50%;
+  width: 6px;
+  height: 6px;
+  background: var(--hud-brass-hi);
+  transform: translateY(-50%) rotate(45deg);
+}
+
+.map__rule {
+  height: 0;
+  margin: 8px 10px;
+  border-top: 1px solid rgb(184 147 90 / 0.55);
+}
+
+/* ---------- Skip link ---------- */
+
+.skip-link {
+  position: fixed;
+  top: 10px;
+  left: 10px;
+  z-index: 100;
+  transform: translateY(-200%);
+}
+
+.skip-link:focus {
+  transform: none;
+}
+
+/* ---------- Room placard (kicker / title / subtitle) ---------- */
+
+.room-placard {
+  padding: 16px 22px 16px;
+}
+
+.room-placard__kicker {
+  margin: 0;
+  font: var(--hud-label);
+  letter-spacing: 0.25em;
+  color: var(--hud-brass);
+}
+
+.room-placard__title {
+  margin: 0.15em 0 0;
+  font-family: var(--font-display);
+  font-size: clamp(1.7rem, 1.3rem + 1.2vw, 2.4rem);
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: 0.04em;
+  color: var(--hud-brass-hi);
+}
+
+.room-placard__subtitle {
+  margin: 0.25em 0 0;
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-weight: 500;
+  font-size: 1.15rem;
+  color: var(--hud-text);
+}
+
+/* ---------- Keyboard lists ---------- */
+
+.room-items:focus-within,
+.lobby-directory:focus-within,
+.no-webgl .room-items,
+.no-webgl .lobby-directory {
+  padding: 14px 10px;
+}
+
+.room-items ul,
+.lobby-directory ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.room-items button,
+.lobby-directory a,
+.lobby-directory__book {
+  display: block;
+  width: 100%;
+  padding: 0.5rem 0.8rem 0.6rem;
+  text-align: left;
+  border: 0;
+  background-color: transparent;
+}
+
+/* ---------- Hints ---------- */
+
+.scene-hint {
+  padding: 0.55em 1.2em 0.6em;
+  font: var(--hud-label);
+  letter-spacing: var(--hud-label-spacing);
+  color: var(--hud-text);
+  white-space: nowrap;
+}
+
+/* ---------- Content panel: a parchment card with a brass double rule ---------- */
+
+.exhibit-panel {
+  padding: 2.6rem 2.1rem 2rem;
+  color: var(--hud-ink-text);
+  background: var(--hud-corners), var(--hud-grain), var(--hud-parchment);
+  border: 1px solid var(--hud-brass);
+  box-shadow:
+    inset 0 0 0 3px var(--hud-parchment),
+    inset 0 0 0 4px var(--hud-brass);
+  font-family: var(--font-serif);
+  font-weight: 500;
+  font-size: 1.15rem;
+  line-height: 1.5;
+}
+
+.exhibit-panel .panel-close {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  padding: 0.4em 0.6em 0.5em;
+  color: var(--hud-oxblood);
+  border: 0;
+  background-color: transparent;
+}
+
+.panel-close__esc {
+  margin-left: 0.4em;
+  font-size: 0.85em;
+  letter-spacing: 0.1em;
+  color: var(--hud-ink-soft);
+}
+
+.panel-entry {
+  outline: none;
+}
+
+.panel-entry + .panel-entry {
+  margin-top: 1.75rem;
+}
+
+.panel-entry__kicker {
+  margin: 0 0 0.3rem;
+  font: var(--hud-label);
+  letter-spacing: 0.22em;
+  color: var(--hud-ink-soft);
+}
+
+.fleuron {
+  color: var(--hud-oxblood);
+  letter-spacing: 0;
+  margin-right: 0.25em;
+}
+
+.panel-entry__title {
+  margin: 0 0 0.9rem;
+  padding-bottom: 0.45rem;
+  font-family: var(--font-display);
+  font-size: clamp(1.6rem, 1.35rem + 0.8vw, 2.1rem);
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: 0.03em;
+  color: var(--hud-oxblood);
+  border-bottom: 1px solid var(--hud-brass);
+}
+
+.panel-sub {
+  margin: 1rem 0 0.3rem;
+  font: var(--hud-label);
+  letter-spacing: 0.22em;
+  color: var(--hud-ink-soft);
+}
+
+.panel-entry p {
+  margin: 0 0 0.75rem;
+}
+
+.panel-meta {
+  font-style: italic;
+  color: var(--hud-ink-soft);
+}
+
+.card-list {
+  margin: 0 0 0.75rem;
+  padding-left: 1.2rem;
+}
+
+.card-list li + li {
+  margin-top: 0.3rem;
+}
+
+.panel-links {
+  margin-top: 1rem !important;
+}
+
+.panel-link {
+  font-weight: 700;
+  color: var(--hud-oxblood);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+}
+
+.panel-link:hover {
+  color: #3d0e10;
+}
+
+.panel-note {
+  font-style: italic;
+  color: var(--hud-ink-soft);
+}
+
+.exhibit-panel .notice {
+  padding: 0;
+  text-align: left;
+  background: none;
+  box-shadow: none;
+  color: var(--hud-ink-text);
+}
+
+.exhibit-panel .notice__title {
+  margin: 0 0 0.3rem;
+  font: var(--hud-label);
+  letter-spacing: 0.2em;
+  color: var(--hud-ink-soft);
+}
+
+/* ---------- Book notes ---------- */
+
+.book-note {
+  padding: 1.1rem 1.25rem 1rem;
+  color: var(--hud-ink-text);
+  background: var(--hud-corners), var(--hud-grain), var(--hud-parchment);
+  border: 1px solid var(--hud-brass);
+  box-shadow:
+    inset 0 0 0 3px var(--hud-parchment),
+    inset 0 0 0 4px var(--hud-brass);
+}
+
+.book-note__text {
+  margin: 0 0 0.45rem;
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-weight: 500;
+  font-size: 1.25rem;
+  line-height: 1.3;
+}
+
+.book-note__source {
+  margin: 0;
+  font: var(--hud-label);
+  letter-spacing: 0.18em;
+  color: var(--hud-ink-soft);
+}
+
+/* ---------- Narrow screens ---------- */
+
+@media (max-width: 699px) {
+  .exhibit-panel {
+    padding: 2.4rem 1.25rem 1.25rem;
+  }
+
+  .scene-hint {
+    white-space: normal;
+    text-align: center;
+    width: calc(100vw - 32px);
+  }
+
+  .room-placard {
+    max-width: calc(100vw - 32px - 9rem);
+  }
+}

@@ -19,6 +19,8 @@ const NOTICE = `
 
 interface Entry {
   id: string
+  /** Small line above the title (shown with a fleuron). */
+  kicker: string
   heading: string
   body: string
 }
@@ -28,45 +30,66 @@ function link(label: string, href: string): string {
   return `<a class="panel-link" href="${esc(href)}"${external ? ' target="_blank" rel="noopener noreferrer"' : ''}>${esc(label)}${external ? '<span class="visually-hidden"> (opens in a new tab)</span>' : ''}</a>`
 }
 
+/** Fields still awaiting the owner's words are left out rather than shown as placeholders. */
+const known = (text: string) => text.trim() !== '' && !text.startsWith('TODO(content)')
+
+const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X']
+
 /** Plain-HTML content for each openable item in a room. Always present in the DOM. */
 function entriesFor(id: ExhibitId): Entry[] {
   switch (id) {
     case 'skills':
       return skillDrawers.map((d) => ({
         id: d.id,
+        kicker: 'Card catalog',
         heading: d.label,
         body: d.items.length ? `<ul class="card-list">${d.items.map((s) => `<li>${esc(s)}</li>`).join('')}</ul>` : NOTICE,
       }))
     case 'projects':
-      return projectCases.map((p) => ({
-        id: p.id,
-        heading: p.title,
-        body: p.summary
-          ? `<p>${esc(p.summary)}</p>
-             ${p.stack.length ? `<p class="panel-meta">${p.stack.map(esc).join(' · ')}</p>` : ''}
-             ${p.links.map((l) => link(l.label, l.href)).join(' ')}`
-          : NOTICE,
-      }))
+      return projectCases.map((p, i) => {
+        const parts: string[] = []
+        if (known(p.context)) parts.push(`<p class="panel-meta">${esc(p.context)}</p>`)
+        if (known(p.what)) parts.push(`<p>${esc(p.what)}</p>`)
+        if (known(p.why)) parts.push(`<h3 class="panel-sub">Why</h3><p>${esc(p.why)}</p>`)
+        const how = p.how.filter(known)
+        if (how.length) parts.push(`<h3 class="panel-sub">How</h3><ul class="card-list">${how.map((h) => `<li>${esc(h)}</li>`).join('')}</ul>`)
+        if (known(p.result)) parts.push(`<h3 class="panel-sub">Result</h3><p>${esc(p.result)}</p>`)
+        if (p.stack.length) parts.push(`<p class="panel-meta">${p.stack.map(esc).join(' · ')}</p>`)
+        const links = p.links.map((l) => link(l.label, l.href))
+        if (p.linkNote) links.push(`<span class="panel-note">${esc(p.linkNote)}</span>`)
+        if (links.length) parts.push(`<p class="panel-links">${links.join('<span aria-hidden="true"> · </span>')}</p>`)
+        return { id: p.id, kicker: `Case ${ROMAN[i] ?? i + 1}`, heading: p.title, body: parts.length ? parts.join('') : NOTICE }
+      })
     case 'about':
       return [
         {
           id: 'journal',
+          kicker: 'From the journal',
           heading: 'About',
           body: aboutParagraphs.length ? aboutParagraphs.map((p) => `<p>${esc(p)}</p>`).join('') : NOTICE,
         },
       ]
     case 'resume':
-      return [{ id: 'letter', heading: 'Résumé', body: resumeHref ? link('Download the résumé (PDF)', resumeHref) : NOTICE }]
+      return [
+        {
+          id: 'letter',
+          kicker: 'The one-page summary',
+          heading: 'Résumé',
+          body: resumeHref ? `<p class="panel-links">${link('Open the résumé (PDF)', resumeHref)}</p>` : NOTICE,
+        },
+      ]
     case 'cv':
-      return [{ id: 'ledger', heading: 'Curriculum Vitae', body: cvHref ? link('Download the CV (PDF)', cvHref) : NOTICE }]
+      return [{ id: 'ledger', kicker: 'The complete record', heading: 'Curriculum Vitae', body: cvHref ? link('Open the CV (PDF)', cvHref) : NOTICE }]
     case 'experience':
       return timeline.length
         ? timeline.map((t) => ({
             id: t.id,
+            kicker: t.kind === 'education' ? 'Education' : t.kind === 'research' ? 'Research' : 'Experience',
             heading: t.title,
-            body: `<p class="panel-meta">${esc(t.org)} · ${esc(t.dates)}</p><p>${esc(t.detail)}</p>`,
+            body: `<p class="panel-meta">${esc(t.org)} · ${esc(t.location)} · ${esc(t.dates)}</p>
+              <ul class="card-list">${t.bullets.map((b) => `<li>${esc(b)}</li>`).join('')}</ul>`,
           }))
-        : [{ id: 'chronology', heading: 'Chronology', body: NOTICE }]
+        : [{ id: 'chronology', kicker: 'A chronology', heading: 'Chronology', body: NOTICE }]
   }
 }
 
@@ -80,7 +103,7 @@ export function renderExhibit(exhibit: Exhibit): string {
         <h1 class="room-placard__title">${esc(exhibit.title)}</h1>
         <p class="room-placard__subtitle">${esc(exhibit.subtitle)}</p>
       </header>
-      <a class="room-back bezel" href="#/lobby"><span aria-hidden="true">←</span> Return to the Lobby</a>
+      <a class="room-back" href="#/lobby"><span aria-hidden="true">←</span> Return to the Lobby</a>
       <nav class="room-items" aria-label="${esc(exhibit.title)} items">
         <ul>
           ${entries
@@ -89,11 +112,12 @@ export function renderExhibit(exhibit: Exhibit): string {
         </ul>
       </nav>
       <aside class="exhibit-panel is-closed" data-panel aria-label="${esc(exhibit.title)}">
-        <button type="button" class="panel-close bezel" data-close>Close <span aria-hidden="true">· Esc</span></button>
+        <button type="button" class="panel-close" data-close>Close<span class="panel-close__esc" aria-hidden="true">Esc</span></button>
         ${entries
           .map(
             (e) => `
           <section class="panel-entry" id="entry-${esc(e.id)}" data-entry="${esc(e.id)}" tabindex="-1">
+            <p class="panel-entry__kicker"><span class="fleuron" aria-hidden="true">❦</span> ${esc(e.kicker)}</p>
             <h2 class="panel-entry__title">${esc(e.heading)}</h2>
             ${e.body}
           </section>`,
@@ -133,8 +157,12 @@ export async function mountExhibit(
   let focusTimer = 0
   let room: { open(id: string): void; close(): void; highlight(id: string | null): void; dispose(): void } | null = null
 
+  const hint = root.querySelector<HTMLElement>('[data-hint]')
+
   function showEntry(id: string | null): void {
     window.clearTimeout(focusTimer)
+    // The "click to examine" hint would compete with the open panel.
+    hint?.classList.toggle('is-hidden', id !== null)
     panel.classList.toggle('is-closed', id === null)
     // A closed panel is visually hidden; keep its controls out of the tab order too.
     // (Without WebGL the panel is the page, so it stays interactive.)
