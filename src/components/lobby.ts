@@ -42,6 +42,7 @@ export function renderLobby(): string {
         <ul>${notes}</ul>
       </section>
       <p class="scene-hint" data-hint aria-hidden="true">Explore the exhibits</p>
+      <a class="lobby-exit" href="#/"><span aria-hidden="true">←</span> Return to the Grounds</a>
       <div class="scene-view__fade" data-fade></div>
     </div>`
 }

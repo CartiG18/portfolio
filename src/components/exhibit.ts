@@ -159,11 +159,13 @@ export async function mountExhibit(
 
   const hint = root.querySelector<HTMLElement>('[data-hint]')
 
-  function showEntry(id: string | null): void {
+  function showEntry(id: string | null, panelSide?: 'left' | 'right'): void {
     window.clearTimeout(focusTimer)
     // The "click to examine" hint would compete with the open panel.
     hint?.classList.toggle('is-hidden', id !== null)
     panel.classList.toggle('is-closed', id === null)
+    if (id && panelSide) root.dataset.panelSide = panelSide
+    else delete root.dataset.panelSide
     // A closed panel is visually hidden; keep its controls out of the tab order too.
     // (Without WebGL the panel is the page, so it stays interactive.)
     panel.inert = id === null && !root.classList.contains('no-webgl')

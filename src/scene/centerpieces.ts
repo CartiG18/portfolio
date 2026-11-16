@@ -21,7 +21,7 @@ export interface ExhibitItem {
    * Where the camera moves when the item is opened. `size` is the object's rough extent
    * (world units) once open, so the room can frame it clear of the content panel.
    */
-  view: { position: THREE.Vector3; target: THREE.Vector3; size: number }
+  view: { position: THREE.Vector3; target: THREE.Vector3; size: number; panelSide?: 'left' | 'right' }
   hover: number
   active: number
   /** 0–1 targets the room eases toward each frame. */
@@ -298,6 +298,8 @@ function projects(kit: Kit): Centerpiece {
           position: new THREE.Vector3(x, 2.9, z + 2.6),
           target: new THREE.Vector3(x, 2.35, z),
           size: 2.6, // plaque to lifted hood
+          // Keep cases on the room's right side clear of the right-wall bookcases.
+          panelSide: x > 0 ? 'left' : 'right',
         },
         apply(h, a) {
           const t = Math.max(h, a)

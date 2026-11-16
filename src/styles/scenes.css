@@ -119,6 +119,17 @@ body[data-view='room'] {
   z-index: 6;
 }
 
+.lobby-exit {
+  position: absolute;
+  right: clamp(16px, 3vw, 32px);
+  bottom: calc(clamp(16px, 3vh, 32px) + env(safe-area-inset-bottom, 0px));
+  z-index: 6;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
+  min-height: 44px;
+}
+
 /* Content panel: all entries stay in the DOM; closed = visually hidden (and inert). */
 .exhibit-panel {
   position: absolute;
@@ -132,6 +143,17 @@ body[data-view='room'] {
   transition:
     opacity 450ms ease,
     transform 450ms var(--ease-out);
+}
+
+.exhibit-room[data-panel-side='left'] .exhibit-panel {
+  right: auto;
+  left: clamp(16px, 3vw, 40px);
+  top: calc(50% + clamp(36px, 6vh, 54px));
+}
+
+.exhibit-room[data-panel-side='left'] .panel-close {
+  right: auto;
+  left: 14px;
 }
 
 .exhibit-panel.is-closed {
@@ -173,6 +195,10 @@ body[data-view='room'] {
 
 /* Narrow screens: the panel docks to the bottom and the camera frames the object above it. */
 @media (max-width: 699px) {
+  .lobby .scene-hint {
+    bottom: calc(clamp(20px, 5vh, 44px) + 56px + env(safe-area-inset-bottom, 0px));
+  }
+
   .exhibit-panel {
     left: 0;
     right: 0;
@@ -180,6 +206,13 @@ body[data-view='room'] {
     bottom: 0;
     width: auto;
     max-height: 50vh;
+    transform: none;
+  }
+
+  .exhibit-room[data-panel-side='left'] .exhibit-panel {
+    left: 0;
+    top: auto;
+    bottom: 0;
     transform: none;
   }
 }

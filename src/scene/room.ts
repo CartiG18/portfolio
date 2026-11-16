@@ -14,7 +14,7 @@ export interface RoomOptions {
   exhibitId: ExhibitId
   reducedMotion: boolean
   /** An item was opened (id) or closed (null) from inside the canvas. */
-  onOpenChange(id: string | null): void
+  onOpenChange(id: string | null, panelSide?: 'left' | 'right'): void
   onHoverChange?(id: string | null): void
   onFirstInteraction?(): void
 }
@@ -204,8 +204,15 @@ export async function createExhibitRoom(opts: RoomOptions): Promise<RoomHandle> 
     // Narrow: object at NDC y = +0.45, above the bottom-docked panel.
     const offset = narrow
       ? up.clone().multiplyScalar(-0.45 * dist * tanV)
-      : right.clone().multiplyScalar(0.45 * dist * tanH).addScaledVector(up, 0.12 * dist * tanV)
-    return { position: position.add(offset), target: it.view.target.clone().add(offset) }
+      : right
+          .clone()
+          .multiplyScalar((it.view.panelSide === 'left' ? -1 : 1) * 0.45 * dist * tanH)
+          .addScaledVector(up, 0.12 * dist * tanV)
+    position.add(offset)
+    const target = it.view.target.clone().add(offset)
+    // On a narrow screen, stay inside the center aisle instead of standing beside a wall shelf.
+    if (narrow) position.x = THREE.MathUtils.clamp(position.x, -2.25, 2.25)
+    return { position, target }
   }
 
   function open(id: string): void {
@@ -215,7 +222,7 @@ export async function createExhibitRoom(opts: RoomOptions): Promise<RoomHandle> 
     firstInteraction()
     for (const other of piece.items) other.wantActive = other.id === id
     openId = id
-    opts.onOpenChange(id)
+    opts.onOpenChange(id, it.view.panelSide)
     stage.setFocus(it.view.target)
     focusPoint.copy(it.view.target)
     sound.steps(1.1, 2)
