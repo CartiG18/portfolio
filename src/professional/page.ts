@@ -46,7 +46,7 @@ function researchProjects(): string {
 
 export function renderProfessionalPage(): string {
   const sectionLinks = tabs.map((tab) => `<a class="professional-tab" href="#section-${tab.id}">${tab.label}</a>`).join('')
-  const about = `<section class="professional-panel" id="section-about"><h2>About</h2><p class="professional-lede">TODO(content): Add a concise professional description in your own words.</p><p>Currently studying computer science and mathematics at Loyola Marymount University.</p></section>`
+  const about = `<section class="professional-panel" id="section-about"><h2>About</h2><p class="professional-lede">I'm a computer science student at Loyola Marymount University working towards a B.S. I try to take on a variety of opportunities to expand my skillset and deepen my industry and research knowledge. I have worked in data engineering in industry, and I am most interested in working in sustainable AI solutions and applications. I am also doing research in human-computer interaction and bioinformatics software.</p></section>`
   const experience = `<section class="professional-panel" id="section-experience"><h2>Experience</h2>${timelineEntries('work')}</section>`
   const education = `<section class="professional-panel" id="section-education"><h2>Education</h2>${timelineEntries('education')}</section>`
   const projectPanel = `<section class="professional-panel" id="section-projects"><h2>Projects</h2>${projects()}</section>`
