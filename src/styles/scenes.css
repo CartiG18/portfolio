@@ -43,6 +43,11 @@ body[data-view='room'] {
   background: #000;
   opacity: 0;
   pointer-events: none;
+  transition: opacity 260ms ease-in;
+}
+
+.scene-view__fade.is-leaving {
+  opacity: 1 !important;
 }
 
 /* Arriving in a 3D view fades up from black. */
