@@ -167,7 +167,8 @@ export const timeline: TimelineEntry[] = [
     location: 'Los Angeles, CA',
     dates: 'Aug 2025 – Present',
     bullets: [
-      'Guide students through debugging and CS coursework, adapting explanations to individual skill levels while preserving independent problem solving.',
+      'Lab teaching assistant at the LMU Keck Computer Science Annex.',
+      'Hold office hours for computer science students and assist them with coursework understanding and programming for multiple CS classes, including Algorithms and Analysis 5 hrs/week.',
     ],
   },
   {

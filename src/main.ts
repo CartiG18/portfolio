@@ -3,6 +3,7 @@ import './styles/base.css'
 import './styles/scenes.css'
 import './styles/exhibit.css'
 import './styles/hud.css'
+import './professional/professional.css'
 
 import { exhibits, findExhibit } from './data/exhibits.ts'
 import { contactLabel, openEmail, site, socialLinks } from './data/site.ts'
@@ -12,6 +13,7 @@ import { mountExhibit, renderExhibit, renderNotFound } from './components/exhibi
 import { esc } from './components/html.ts'
 import { sound } from './audio.ts'
 import { isKnownExhibitRoute, isRouteHash, parseRoute, routeHref, type Route } from './routes.ts'
+import { renderProfessionalPage } from './professional/page.ts'
 
 const REDUCED_MOTION = window.matchMedia('(prefers-reduced-motion: reduce)')
 
@@ -51,6 +53,9 @@ function render(route: Route): void {
       reducedMotion: REDUCED_MOTION.matches,
       onEnterExhibit: (id) => (location.hash = `#/${id}`),
     }).then(adopt)
+  } else if (route.view === 'professional') {
+    main.innerHTML = renderProfessionalPage()
+    document.title = `${site.ownerName} · Professional Portfolio`
   } else {
     const exhibit = findExhibit(route.id)
     main.innerHTML = exhibit ? renderExhibit(exhibit) : renderNotFound()
@@ -84,13 +89,14 @@ function renderMap(): void {
     { href: '#/lobby', label: 'Library Lobby' },
     ...exhibits.map((e) => ({ href: `#/${e.id}`, label: `${e.number}. ${e.title}` })),
   ]
+  const portfolioChoices = `<li><a href="#/" data-portfolio="museum">Museum portfolio</a></li><li><a href="#/professional" data-portfolio="professional">Professional portfolio</a></li><li class="map__rule" aria-hidden="true"></li>`
   const exhibitItems = items.map((i) => `<li><a href="${esc(i.href)}">${esc(i.label)}</a></li>`).join('')
   // Elsewhere: profiles, and the email link (address assembled only on click).
   const elsewhere = socialLinks
     .filter((l) => l.href)
     .map((l) => `<li><a href="${esc(l.href)}" target="_blank" rel="noopener noreferrer">${esc(l.label)}<span class="visually-hidden"> (opens in a new tab)</span></a></li>`)
     .join('')
-  mapList.innerHTML = `${exhibitItems}<li class="map__rule" aria-hidden="true"></li>${elsewhere}<li><button type="button" class="map__email" data-email>${esc(contactLabel)}</button></li>`
+  mapList.innerHTML = `${portfolioChoices}${exhibitItems}<li class="map__rule" aria-hidden="true"></li>${elsewhere}<li><button type="button" class="map__email" data-email>${esc(contactLabel)}</button></li>`
   mapList.querySelector('[data-email]')!.addEventListener('click', openEmail)
 }
 
@@ -100,6 +106,8 @@ function updateMap(route: Route): void {
     if (link.getAttribute('href') === current) link.setAttribute('aria-current', 'page')
     else link.removeAttribute('aria-current')
   }
+  mapList.querySelector('[data-portfolio="professional"]')?.toggleAttribute('aria-current', route.view === 'professional')
+  mapList.querySelector('[data-portfolio="museum"]')?.toggleAttribute('aria-current', route.view !== 'professional')
   mapDetails.open = false
 }
 
